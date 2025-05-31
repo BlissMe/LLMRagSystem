@@ -1,0 +1,7 @@
+# Ignore environment files
+.env
+
+# Ignore Python key parameter files
+key_param.py
+test.py
+knowledgebase.py
