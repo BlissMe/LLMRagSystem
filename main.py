@@ -68,7 +68,7 @@ async def ask_question(data: QueryRequest):
         instructions= "your role is to answer user query by referring given context" # Add the context here
 
     )
-    print("****response: ", response.output_text)
+    return {"response": response.output_text}
 
     
     
