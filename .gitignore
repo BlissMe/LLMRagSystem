@@ -5,3 +5,5 @@
 key_param.py
 test.py
 knowledgebase.py
+__pycache__/
+venv/
