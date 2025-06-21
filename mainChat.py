@@ -16,10 +16,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+class SummaryRequest(BaseModel):
+    history: str
 
+@app.post("/summarize")
+async def summarize_chat(data: SummaryRequest):
+    summary_prompt = f"""
+You are a helpful assistant. Summarize the following chat conversation between a user and a bot.
+
+Chat:
+{data.history}
+
+Provide a short, clear summary:
+"""
+
+    summarizer = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
+    response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
+
+    return { "summary": response.content.strip() }
 
 class QueryRequest(BaseModel):
     user_query: str
+    history: str
 
 
 @app.get("/")
@@ -59,6 +77,7 @@ Examples:
 @app.post("/ask")
 async def ask_question(data: QueryRequest):
     query = data.user_query
+    history = data.history
 
     # MongoDB Setup
     client = MongoClient(key_param.MONGO_URI)
@@ -97,6 +116,9 @@ Tone Guide: {tone_prompt[depression_level]}
 
 You can use the following context if it's helpful:
 {context_texts}
+
+Here is the full chat history so far if it's helpful:
+{history}
 
 User said: "{query}"
 
