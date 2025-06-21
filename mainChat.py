@@ -16,6 +16,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 class SummaryRequest(BaseModel):
     history: str
 
@@ -34,6 +35,9 @@ Provide a short, clear summary:
     response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
 
     return { "summary": response.content.strip() }
+
+
+
 
 class QueryRequest(BaseModel):
     user_query: str
