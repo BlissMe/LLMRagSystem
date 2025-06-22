@@ -17,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# for session summary
 class SummaryRequest(BaseModel):
     history: str
 
@@ -38,11 +39,11 @@ Provide a short, clear summary:
 
 
 
-
+# for chat queries
 class QueryRequest(BaseModel):
     user_query: str
     history: str
-
+    summaries: list[str] = []
 
 @app.get("/")
 def read_root():
@@ -102,6 +103,8 @@ async def ask_question(data: QueryRequest):
     # Depression Classification
     depression_level = detect_depression_signals(query)
 
+    summary_text = "\n".join(data.summaries) if data.summaries else "No previous summaries available."
+
     # Adjust reply style based on depression level
     tone_prompt = {
         "high": "Be extremely supportive, friendly, and encouraging. Avoid giving advice. Ask how you can support them.",
@@ -117,6 +120,9 @@ Respond in a short, friendly, and empathetic tone like a caring best friend.
 NEVER say "I see", and DO NOT write long paragraphs.
 
 Tone Guide: {tone_prompt[depression_level]}
+
+You may also refer to the following summaries of previous conversations (if helpful):
+{summary_text} 
 
 You can use the following context if it's helpful:
 {context_texts}
