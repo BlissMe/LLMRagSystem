@@ -140,6 +140,7 @@ Avoid clinical or crisis language unless directly asked.
 
 Your only job is to respond warmly and keep the conversation going in a friendly way.
 
+Don not ask same question again and again.
 Respond in a short, kind, and caring tone.
 Don't ask more than one question in a message.
 If you include a PHQ-9 question, don't mix it with anything else.
@@ -183,6 +184,62 @@ Now reply like a kind friend:
         if similarity > 0.6 or q["question"].lower() in final_text.lower():
             matched_q = q
             break
+
+#     checker_prompt = f"""
+# You are a system that determines if a given message is paraphrasing any of the official PHQ-9 questions listed below.
+
+# Your task is to detect **semantic matches**, even when the message is **rephrased or worded differently**. Respond ONLY with the exact original PHQ-9 question from the list if there's a match. If none match, respond with "NONE".
+
+# ### PHQ-9 Questions:
+# {[q["question"] for q in PHQ9_QUESTIONS if q["id"] not in data.asked_phq_ids]}
+
+# ### Examples:
+
+# Message: "Trouble concentrating on things, such as reading the newspaper or watching TV?"
+# → "Little interest or pleasure in doing things"
+
+# Message: "Do you feel really down or hopeless lately?"
+# → "Feeling down, depressed, or hopeless"
+
+# Message: "Are you having trouble sleeping or maybe sleeping too much?"
+# → "Trouble falling or staying asleep, or sleeping too much"
+
+# Message: "Have you been feeling unusually tired or lacking energy?"
+# → "Feeling tired or having little energy"
+
+# Message: "Any changes in your eating habits, like not eating enough or eating too much?"
+# → "Poor appetite or overeating"
+
+# Message: "Do you feel like a failure or that you've let your family down?"
+# → "Feeling bad about yourself — or that you are a failure or have let yourself or your family down"
+
+# Message: "Have you been struggling to concentrate while reading or watching something?"
+# → "Trouble concentrating on things, such as reading the newspaper or watching TV"
+
+# Message: "Do you feel slowed down or unusually restless?"
+# → "Moving or speaking slowly, or being fidgety or restless"
+
+# Message: "Have you had thoughts of hurting yourself or feeling like you'd be better off gone?"
+# → "Thoughts that you would be better off dead or of hurting yourself"
+
+# like these examples, you will be given a message to analyze.
+# Now analyze the following message:
+
+# Message: "{final_text}"
+
+# If it matches, respond ONLY with the exact PHQ-9 question text. If not, respond with "NONE".
+# """
+
+#     checker = ChatOpenAI(
+#         model="gpt-4",
+#         openai_api_key=key_param.openai_api_key,
+#         temperature=0
+#     )
+
+#     phq_detection = checker.invoke([{"role": "user", "content": checker_prompt}])
+#     detected_text = phq_detection.content.strip()
+#     matched_q = next((q for q in unasked_questions if q["question"] == detected_text), None)
+#     print("Checker Raw Output:", detected_text)
 
     return {
         "response": final_text,
