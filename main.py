@@ -71,4 +71,4 @@ async def ask_question(data: QueryRequest):
     return {"response": response.output_text}
 
     
-    
+   #comment

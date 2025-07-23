@@ -8,6 +8,8 @@ import key_param
 from utils.phq9_questions import PHQ9_QUESTIONS
 from difflib import SequenceMatcher
 
+
+
 app = FastAPI()
 
 app.add_middleware(
@@ -17,6 +19,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 # for session summary
 class SummaryRequest(BaseModel):
@@ -165,7 +169,7 @@ Now reply like a kind friend:
 
     # Generate response
     bot = ChatOpenAI(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         openai_api_key=key_param.openai_api_key,
         temperature=0.8
     )
