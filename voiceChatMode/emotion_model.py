@@ -8,7 +8,7 @@ import librosa
 import os
 
 # Define emotions
-emotions = ['angry', 'happy', 'neutral', 'sad', 'fearful']
+emotions = ['angry', 'sad', 'neutral', 'happy', 'fearful']
 EMOTION_LABELS = emotions
 LABEL2ID = {label: idx for idx, label in enumerate(emotions)}
 
