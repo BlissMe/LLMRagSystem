@@ -1,26 +1,30 @@
-from fastapi import APIRouter
+from fastapi import FastAPI
 from pydantic import BaseModel
 from pymongo import MongoClient
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from difflib import SequenceMatcher
-from utils.phq9_questions import PHQ9_QUESTIONS
-from utils.tts import generate_tts_audio 
+from fastapi.middleware.cors import CORSMiddleware
 import key_param
-from fastapi.responses import FileResponse
-
-router = APIRouter()
-
+from utils.phq9_questions import PHQ9_QUESTIONS
 from difflib import SequenceMatcher
+import re
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # for session summary
 class SummaryRequest(BaseModel):
     history: str
 
-@router.post("/summarize")
+@app.post("/summarize")
 async def summarize_chat(data: SummaryRequest):
-    print("Received /summarize request with history length:", len(data.history))
-
     summary_prompt = f"""
 You are a helpful assistant. Summarize the following chat conversation between a user and a bot.
 
@@ -30,10 +34,12 @@ Chat:
 Provide a short, clear summary:
 """
 
-    summarizer = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
+    summarizer = ChatOpenAI(model="gpt-4.1", openai_api_key=key_param.openai_api_key)
     response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
 
     return { "summary": response.content.strip() }
+
+
 
 # for chat queries
 class QueryRequest(BaseModel):
@@ -42,12 +48,44 @@ class QueryRequest(BaseModel):
     summaries: list[str] = []
     asked_phq_ids: list[int] = []
 
-@router.post("/ask")
+@app.get("/")
+def read_root():
+    return {"message": "API is running"}
+
+
+# def detect_depression_signals(user_input: str) -> str:
+#     system_prompt = """
+# You are an assistant that analyzes if a message shows signs of depression.
+
+# Only respond with:
+# - high
+# - moderate
+# - low
+
+# Examples:
+# "I feel so empty and tired all the time" → high
+# "Sometimes I feel alone, but I'm okay" → moderate
+# "I'm good, just bored today" → low
+# """
+
+#     detector = ChatOpenAI(
+#         model="gpt-3.5-turbo",
+#         openai_api_key=key_param.openai_api_key,
+#         temperature=0
+#     )
+
+#     response = detector.invoke([
+#         {"role": "system", "content": system_prompt},
+#         {"role": "user", "content": user_input}
+#     ])
+
+#     return response.content.strip().lower()
+
+@app.post("/ask")
 async def ask_question(data: QueryRequest):
     query = data.user_query
     history = data.history
 
-    # MongoDB Setup
     client = MongoClient(key_param.MONGO_URI)
     db = client["Depression_Knowledge_Base"]
     collection = db["depression"]
@@ -69,7 +107,7 @@ async def ask_question(data: QueryRequest):
     # Determine if we are in early stage (first 2 turns)
     user_turns = [line for line in data.history.splitlines() if line.lower().startswith("you:") or line.lower().startswith("user:")]
     early_stage = len(user_turns) < 3
-    
+
     phq_instruction = ""
     if next_phq_q and not early_stage:
         if not data.asked_phq_ids:
@@ -125,7 +163,7 @@ Now reply like a kind friend:
 """
 
     bot = ChatOpenAI(
-        model="gpt-3.5-turbo",
+        model="gpt-4",
         openai_api_key=key_param.openai_api_key,
         temperature=0.7
     )
@@ -133,21 +171,15 @@ Now reply like a kind friend:
     chat_response = bot.invoke([
         {"role": "system", "content": chat_prompt}
     ])
+
     final_text = chat_response.content.strip()
     client.close()
 
+    # Detect if PHQ-9 question was asked
+   
     matched_q = next_phq_q if not early_stage else None
-
-
-    audio_path = generate_tts_audio(final_text)
-
     return {
         "response": final_text,
-        "audio_url": f"/voice-audio?path={audio_path}",  
         "phq9_questionID": matched_q["id"] if matched_q else None,
         "phq9_question": matched_q["question"] if matched_q else None
     }
-    
-@router.get("/voice-audio")
-def voice_audio(path: str):
-    return FileResponse(path, media_type="audio/mpeg", filename="bot_reply.mp3")      
