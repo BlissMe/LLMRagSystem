@@ -64,49 +64,46 @@ async def ask_question(data: QueryRequest):
     summary_text = "\n".join(data.summaries) if data.summaries else "No previous summaries available."
 
     unasked_questions = [q for q in PHQ9_QUESTIONS if q["id"] not in data.asked_phq_ids]
-    next_phq_q = unasked_questions[0] if unasked_questions else None
 
-    # Determine if we are in early stage (first 2 turns)
-    user_turns = [line for line in data.history.splitlines() if line.lower().startswith("you:") or line.lower().startswith("user:")]
-    early_stage = len(user_turns) < 3
-    
     phq_instruction = ""
-    if next_phq_q and not early_stage:
-        if not data.asked_phq_ids:
-            phq_instruction += f"""
-You may now gently say something like:
-"To better understand how you're doing, I'd like to ask a few short questions on how you feel in past two weeks."
+    if unasked_questions:
+        phq_instruction += """
+If any of the following questions feel appropriate based on the user's mood, gently ask one of them.
+Only include one question if it fits the situation. Rephrase it naturally. If none fit, skip them completely.
 
-Then ask this question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
+Here are the available questions:
 """
-        else:
-            phq_instruction += f"""
-Continue with the next question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
+        for q in unasked_questions:
+            phq_instruction += f'- "{q["question"]}"\n'
 
         phq_instruction += """
-Make your response short and caring. Don't explain too much. No repetition. Only ask one PHQ-9 question per message.
-Let user respond with:
+Make sure the user can answer with something like:
 - not at all
 - several days
 - more than half the days
-- nearly every day
+- nearly every day        
+Do not say it's from PHQ-9.
+Don't use parentheses when asking question.
+Don't list choices.
+Only ask if it makes sense in context.
 """
 
     chat_prompt = f"""
-You are a friendly chatbot who talks like a kind friend.
+You are a friendly chatbot who talks to users like a warm and caring friend.
 
-Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
+You are trained to help users with their feelings and thoughts, especially related to depression.
+You should always respond in a kind and supportive way, making the user feel heard and understood.
+NEVER say "I cannot help you".
+Avoid clinical or crisis language unless directly asked.
 
-Your job is to gently explore how the user feels, and ask PHQ-9 questions naturally when ready.
+Your only job is to respond warmly and keep the conversation going in a friendly way.
 
-NEVER mention PHQ-9 or say "I cannot help you".
-
-Avoid medical or crisis terms unless directly asked.
-
-Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
+Do not ask same question again and again.
+Respond in a short, kind, and caring tone.
+Don't ask more than one question in a message.
+If you include a PHQ-9 question, don't mix it with anything else.
+Try to vary your tone and phrasing from previous messages.
+Avoid sounding like a script or repeating past responses.
 
 Past summaries:
 {summary_text}
@@ -127,17 +124,19 @@ Now reply like a kind friend:
     bot = ChatOpenAI(
         model="gpt-3.5-turbo",
         openai_api_key=key_param.openai_api_key,
-        temperature=0.7
+        temperature=0.8
     )
 
-    chat_response = bot.invoke([
-        {"role": "system", "content": chat_prompt}
-    ])
+    chat_response = bot.invoke([{"role": "system", "content": chat_prompt}])
     final_text = chat_response.content.strip()
     client.close()
 
-    matched_q = next_phq_q if not early_stage else None
-
+    matched_q = None
+    for q in unasked_questions:
+        similarity = SequenceMatcher(None, q["question"].lower(), final_text.lower()).ratio()
+        if similarity > 0.6 or q["question"].lower() in final_text.lower():
+            matched_q = q
+            break
 
     audio_path = generate_tts_audio(final_text)
 
