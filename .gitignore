@@ -7,3 +7,7 @@ test.py
 knowledgebase.py
 __pycache__/
 venv/
+voiceChatMode/
+model_checkpoints/
+wav2vec2_model/
+best_model_v3.pth
