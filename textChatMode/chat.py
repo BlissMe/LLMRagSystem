@@ -13,7 +13,28 @@ router = APIRouter()
 
 from difflib import SequenceMatcher
 
-# for session summary
+# # for session summary
+# class SummaryRequest(BaseModel):
+#     history: str
+
+# @router.post("/summarize")
+# async def summarize_chat(data: SummaryRequest):
+#     print("Received /summarize request with history length:", len(data.history))
+
+#     summary_prompt = f"""
+# You are a helpful assistant. Summarize the following chat conversation between a user and a bot.
+
+# Chat:
+# {data.history}
+
+# Provide a short, clear summary:
+# """
+
+#     summarizer = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
+#     response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
+
+#     return { "summary": response.content.strip() }
+
 class SummaryRequest(BaseModel):
     history: str
 
@@ -21,19 +42,18 @@ class SummaryRequest(BaseModel):
 async def summarize_chat(data: SummaryRequest):
     print("Received /summarize request with history length:", len(data.history))
 
-    summary_prompt = f"""
-You are a helpful assistant. Summarize the following chat conversation between a user and a bot.
+    # Join lines into one paragraph without altering the original words.
+    paragraph = (
+        data.history
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+        .strip()
+    )
 
-Chat:
-{data.history}
+    # Keep the same response shape to avoid frontend changes.
+    return {"summary": paragraph}
 
-Provide a short, clear summary:
-"""
-
-    summarizer = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
-    response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
-
-    return { "summary": response.content.strip() }
 
 # for chat queries
 class QueryRequest(BaseModel):
