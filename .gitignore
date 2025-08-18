@@ -7,3 +7,6 @@ test.py
 knowledgebase.py
 __pycache__/
 venv/
+voiceChatMode/model_checkpoints/
+voiceChatMode/wav2vec2_model/
+model_checkpoints/
