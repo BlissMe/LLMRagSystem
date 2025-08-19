@@ -22,7 +22,7 @@ router = APIRouter()
 # -----------------------------
 # Ollama / ngrok configuration
 # -----------------------------
-OLLAMA_BASE = os.getenv("OLLAMA_BASE", "https://d53cb0fd37cb.ngrok-free.app").rstrip("/")
+OLLAMA_BASE = os.getenv("OLLAMA_BASE", "https://e037d0b95762.ngrok-free.app").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral-mentalhealth")
 _auth_tuple = (os.getenv("OLLAMA_USER"), os.getenv("OLLAMA_PASS"))
 AUTH = _auth_tuple if all(_auth_tuple) else None
@@ -45,10 +45,10 @@ def strip_tags(s: str) -> str:
     s = re.sub(r"\[/?INST\]", " ", s, flags=re.I)
     return re.sub(r"\s+", " ", s).strip()
 
-def keep_1_to_2_sentences(s: str) -> str:
-    """Keep only the first 1–2 sentences to avoid rambling."""
+def keep_up_to_5_sentences(s: str) -> str:
+    """Keep only the first 1–5 sentences to avoid rambling."""
     parts = re.split(r"(?<=[.!?])\s+", s.strip())
-    return " ".join(parts[:2]).strip()
+    return " ".join(parts[:5]).strip()
 
 def _ollama_chat(system_text: str, user_text: str,
                  temperature: float = 0.25, num_predict: int = 140) -> str:
@@ -104,6 +104,71 @@ def _ollama_generate(system_text: str, user_text: str,
     )
     r.raise_for_status()
     return (r.json().get("response") or "").strip()
+
+def split_sents(s: str) -> list[str]:
+    return [t.strip() for t in re.split(r"(?<=[.!?])\s+", s.strip()) if t.strip()]
+
+def _short_tip_for(user_text: str) -> str:
+    """Tiny, non-medical, practical nudges keyed off common themes."""
+    text = user_text.lower()
+    PAIRS = [
+        (r"(workload|projects|deadline|assignments?)", 
+         "Let’s list your tasks, circle the most urgent, and start with a tiny 10–15 minute step."),
+        (r"(sleep|insomni|wake|tired at night)", 
+         "A simple wind-down routine and consistent sleep/wake times often help."),
+        (r"(focus|concentrate|study|attention)", 
+         "Try a 20-minute focus block with a 5-minute break and put your phone out of sight."),
+        (r"(anxious|anxiety|panic|crowd)", 
+         "Slow, box breathing (in-4, hold-4, out-4, hold-4 for 60–90s) can settle your body."),
+        (r"(appetite|eat|overeating|undereating)", 
+         "Gentle, regular meals/snacks help more than chasing a perfect plan."),
+        (r"(guilt|blam(e|ing)|mistake)", 
+         "Notice the self-talk and test it: what would you say to a friend in your shoes?")
+    ]
+    for pat, tip in PAIRS:
+        if re.search(pat, text):
+            return tip
+    return "We can make this feel manageable by taking one small step at a time."
+
+def ensure_min_3_sentences(text: str, user_text: str) -> str:
+    """If too short, add a tiny practical tip so total is 3–5 sentences."""
+    sents = split_sents(text)
+    if len(sents) >= 3:
+        return " ".join(sents[:5])
+    tip = _short_tip_for(user_text)
+    if len(sents) == 0:
+        sents = ["I'm here with you."]
+    if len(sents) == 1:
+        sents.insert(1, tip)
+    else:  # 2 sentences
+        sents.append(tip)
+    return " ".join(sents[:5])
+
+def ensure_one_gentle_question(text: str, user_text: str) -> str:
+    """Guarantee exactly one soft question at the end."""
+    sents = split_sents(text)
+    has_qmark = text.count("?") > 0
+    if has_qmark and sents and sents[-1].endswith("?"):
+        # already ends with a single question – trim extra questions if any
+        # (keep only the last '?', keep up to 5 sentences total)
+        return " ".join(sents[:5])
+
+    # choose a context-aware question
+    q = "What would make this feel a bit lighter right now—picking one task to start, or setting a 15-minute focus block?"
+    lt = user_text.lower()
+    if re.search(r"(sleep|wake|insomni)", lt):
+        q = "Would it help to try one small change for sleep tonight, like a 20-minute wind-down or a fixed lights-out?"
+    elif re.search(r"(focus|study|concentrate)", lt):
+        q = "Shall we pick one page or one 20-minute block to start with and see how it goes?"
+    elif re.search(r"(anxious|crowd|panic)", lt):
+        q = "When does the anxiety tend to spike most, and would you like to try a 60-second breathing reset together?"
+
+    # append/replace the final sentence with the question, keeping ≤5 total
+    core = " ".join(sents[:4]) if len(sents) >= 4 else " ".join(sents)
+    core = core.strip()
+    if core and not core.endswith((".", "!", "?")):
+        core += "."
+    return (core + " " + q).strip()
 
 # -------------- request models --------------
 
@@ -186,14 +251,14 @@ Guidance for the next turn (for you):
 
     # Call Ollama: chat first, fallback to generate
     try:
-        reply = _ollama_chat(system_text, user_text, temperature=0.25, num_predict=140)
+        reply = _ollama_chat(system_text, user_text, temperature=0.25, num_predict=240)
         if not reply:
-            reply = _ollama_generate(system_text, user_text, temperature=0.25, num_predict=140)
+            reply = _ollama_generate(system_text, user_text, temperature=0.25, num_predict=240)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Ollama call failed: {e}")
 
     # Post-clean and keep short
-    reply = keep_1_to_2_sentences(strip_tags(reply))
+    reply = keep_up_to_5_sentences(strip_tags(reply))
     if not reply:
         reply = "I'm here with you. What feels hardest right now?"
 
