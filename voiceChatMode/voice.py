@@ -110,19 +110,3 @@ async def voice_chat(
 def voice_audio(path: str):
     return FileResponse(path, media_type="audio/mpeg", filename="bot_reply.mp3")
 
-@router.get("/greeting")
-async def greeting():
-    greeting_text = "Hello. How are you feeling today?"
-    query_data = QueryRequest(
-        user_query="__greeting__",
-        history="",
-        summaries=[],
-        asked_phq_ids=[]
-    )
-
-    ask_result = await ask_question(query_data)
-
-    return {
-        "bot_response": greeting_text,
-        "audio_url": ask_result["audio_url"],
-    }
