@@ -2,7 +2,7 @@
 import os, json, requests
 from jsonschema import validate  # pip install jsonschema
 
-BASE = os.getenv("OLLAMA_BASE", "https://d53cb0fd37cb.ngrok-free.app")
+BASE = os.getenv("OLLAMA_BASE", "https://e037d0b95762.ngrok-free.app")
 AUTH = None  # or ("user","pass") if you used --basic-auth
 
 STOPS = ["</s>", "[INST]", "User:", "\nUser"]
