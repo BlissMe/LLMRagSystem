@@ -17,3 +17,4 @@ gtts
 transformers
 librosa
 torch==2.4.0+cpu
+python-dotenv
