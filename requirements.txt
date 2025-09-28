@@ -16,6 +16,11 @@ numpy>=1.26.0
 scipy==1.16.2
 pandas==2.2.3
 scikit-learn==1.7.2
+langchain==0.3.25
+langchain-community==0.3.24
+langchain-core==0.3.63
+langchain-mongodb==0.6.2
+langchain-openai==0.3.18
 
 # Audio & speech
 pydub==0.25.1
