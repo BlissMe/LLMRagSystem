@@ -19,7 +19,7 @@ class EmotionClassifier(nn.Module):
 
 
         #MODEL_PATH = os.path.join("voiceChatMode", "wav2vec2_model", "wav2vec2_model")
-        MODEL_PATH = "ImashaNawodi/my-wav2vec2-emotion/wav2vec2_model/wav2vec2_model"         
+        MODEL_PATH = "ImashaNawodi/my-wav2vec2-emotion"         
         self.wav2vec2 = Wav2Vec2Model.from_pretrained(MODEL_PATH)
         self.dropout = nn.Dropout(0.3)
         self.fc_audio = nn.Linear(self.wav2vec2.config.hidden_size, 128)
@@ -38,13 +38,13 @@ class EmotionClassifier(nn.Module):
 # === Load Model ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = EmotionClassifier(num_labels=len(emotions)).to(device)
-model.load_state_dict(torch.load("ImashaNawodi/my-wav2vec2-emotion/model_checkpoints/best_model_v3.pth", map_location=device))
+model.load_state_dict(torch.load("ImashaNawodi/my-wav2vec2-emotion", map_location=device))
 #model.load_state_dict(torch.load("voiceChatMode/model_checkpoints/best_model_v3.pth", map_location=device))
 model.eval()
 
 # === Load Processor ===
 #processor = Wav2Vec2Processor.from_pretrained("voiceChatMode/wav2vec2_model/wav2vec2_model")
-processor = Wav2Vec2Processor.from_pretrained("ImashaNawodi/my-wav2vec2-emotion/wav2vec2_model/wav2vec2_model")
+processor = Wav2Vec2Processor.from_pretrained("ImashaNawodi/my-wav2vec2-emotion")
 
 # === Predict Function ===
 import traceback
