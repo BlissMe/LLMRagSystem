@@ -1,5 +1,6 @@
 # Use Python slim image
-FROM python:3.10-slim   # Important: use 3.10 for prebuilt dlib wheels
+FROM python:3.10-slim   
+# Important: use 3.10 for prebuilt dlib wheels
 
 # Set working directory
 WORKDIR /app
