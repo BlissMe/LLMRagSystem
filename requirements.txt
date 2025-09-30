@@ -29,9 +29,9 @@ soundfile==0.13.1
 
 # Computer Vision / Face recognition
 opencv-python==4.9.0
-dlib==19.24.2
-face_recognition==1.2.3
-face-recognition-models==0.3.0
+#dlib==19.24.2
+#face_recognition==1.2.3
+#face-recognition-models==0.3.0
 Pillow>=11.0.0
 
 # Database
