@@ -175,3 +175,22 @@ zstandard==0.23.0
 face_recognition==1.3.0
 opencv-python==4.9.0.80
 Pillow==10.3.0
+
+
+# FYPKnowledgeBase
+
+### uvicorn main:app --reload
+
+### uvicorn mainChat:app --reload
+
+
+## creating vertual environment
+
+### python -m venv venv
+
+
+## Activate vertual environment
+
+### .\venv\Scripts\Activate
+
+
