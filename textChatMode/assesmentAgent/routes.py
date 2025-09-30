@@ -20,24 +20,16 @@ class QueryRequest(BaseModel):
     summaries: List[str] = []
     asked_phq_ids: List[int] = []
 
-# Lazy initialization
-AGENT = None
-
-def get_agent():
-    global AGENT
-    if AGENT is None:
-        AGENT = DepressionAgent(
-            mongo_uri=key_param.MONGO_URI,
-            db_name="Depression_Knowledge_Base",
-            collection_name="depression",
-            index_name="default1",
-        )
-    return AGENT
+AGENT = DepressionAgent(
+    mongo_uri=key_param.MONGO_URI,
+    db_name="Depression_Knowledge_Base",
+    collection_name="depression",
+    index_name="default1",
+)
 
 @router.post("/ask")
 async def ask_question(data: QueryRequest):
-    agent = get_agent()
-    return agent.run(
+    return AGENT.run(
         query=data.user_query,
         history=data.history,
         summaries=data.summaries,
