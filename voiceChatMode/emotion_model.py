@@ -8,6 +8,11 @@ import librosa
 import os
 from huggingface_hub import hf_hub_download
 
+# === Globals for lazy loading ===
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = None
+processor = None
+
 # Define emotions
 emotions = ['angry', 'sad', 'neutral', 'happy', 'fearful']
 EMOTION_LABELS = emotions
@@ -34,25 +39,23 @@ class EmotionClassifier(nn.Module):
         logits = self.fc_combined(combined)
         return logits
 
-# === Load Model ===
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = EmotionClassifier(num_labels=len(emotions)).to(device)
-
-# Download fine-tuned checkpoint from Hugging Face
-checkpoint_path = hf_hub_download(
-    repo_id="ImashaNawodi/my-wav2vec2-emotion",
-    filename="best_model_v3.pth"
-)
-
-# Load fine-tuned weights
-model.load_state_dict(torch.load(checkpoint_path, map_location=device))
-model.eval()
-
-# === Load Processor ===
-processor = Wav2Vec2Processor.from_pretrained("ImashaNawodi/my-wav2vec2-emotion")
-
-# === Predict Function ===
+# === Predict Function with lazy loading ===
 def predict_emotion(wav_io: BytesIO) -> str:
+    global model, processor
+
+    # Lazy load model and processor only on first call
+    if model is None or processor is None:
+        model = EmotionClassifier(num_labels=len(emotions)).to(device)
+
+        checkpoint_path = hf_hub_download(
+            repo_id="ImashaNawodi/my-wav2vec2-emotion",
+            filename="best_model_v3.pth"
+        )
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        model.eval()
+
+        processor = Wav2Vec2Processor.from_pretrained("ImashaNawodi/my-wav2vec2-emotion")
+
     try:
         print("Reading audio from BytesIO...")
         wav_io.seek(0)
