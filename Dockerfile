@@ -1,31 +1,23 @@
-# Use Python 3.10 (compatible with prebuilt wheels)
-FROM python:3.10
+FROM python:3.10-bullseye
 
-# Avoid interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system dependencies needed for dlib and face_recognition
 RUN apt-get update && apt-get install -y \
     cmake \
     build-essential \
     libgtk-3-dev \
-    libboost-all-dev \
     ffmpeg \
     libsndfile1 \
     wget \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip, wheel, setuptools
 RUN pip install --upgrade pip setuptools wheel
 
 # Install dlib from a prebuilt wheel
-RUN pip install --no-cache-dir dlib==19.24.2
+RUN pip install dlib==19.24.2 --find-links https://github.com/davisking/dlib/releases
 
-# Install the rest of Python dependencies
-RUN pip install --no-cache-dir face_recognition==1.3.0 numpy Pillow Click
+# Install face_recognition and other deps
+RUN pip install face_recognition==1.3.0 numpy Pillow Click
 
-# Copy app code
 COPY . .
 
 EXPOSE 7860
