@@ -11,7 +11,7 @@ RUN apt-get update && \
         libsndfile1 \
         build-essential \
         gfortran \
-        libatlas-base-dev \
+        libatlas3-base \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
