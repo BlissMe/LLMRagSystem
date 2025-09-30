@@ -1,24 +1,28 @@
-FROM python:3.10-bullseye
+FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y \
-    cmake \
-    build-essential \
-    libgtk-3-dev \
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies (runtime only, no heavy dev tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
-    wget \
-    python3-dev \
+    libatlas3-base \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip setuptools wheel
+# Copy requirements first (for caching)
+COPY requirements.txt .
 
-# Install dlib from a prebuilt wheel
-RUN pip install dlib==19.24.2 --find-links https://github.com/davisking/dlib/releases
+# Upgrade pip and install dependencies
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Install face_recognition and other deps
-RUN pip install face_recognition==1.3.0 numpy Pillow Click
-
+# Copy project code
 COPY . .
 
+# Expose Hugging Face default port
 EXPOSE 7860
+
+# Start FastAPI with uvicorn (no reload in production)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
