@@ -45,6 +45,6 @@ orjson==3.10.15
 tqdm==4.67.1
 typing-extensions==4.12.2
 dataclasses-json==0.6.7
-gradio
+groq
 # PyTorch CPU index
 --extra-index-url https://download.pytorch.org/whl/cpu  
