@@ -1,4 +1,3 @@
-# Use slim Debian-based Python
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -10,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     ffmpeg \
     libsndfile1 \
-    libatlas-base-dev \
+    libblas-dev \
+    liblapack-dev \
     python3-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
+# Copy application code
 COPY . .
 
 EXPOSE 7860
