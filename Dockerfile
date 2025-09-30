@@ -1,4 +1,3 @@
-# Use official Python slim image
 FROM python:3.11-slim
 
 # Set working directory
@@ -10,16 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libatlas3-base \
     curl \
-    build-essential \
-    cmake \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for caching)
 COPY requirements.txt .
 
 # Upgrade pip and install dependencies
-RUN pip install --upgrade pip \
+RUN pip install --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copy project code
