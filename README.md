@@ -14,3 +14,4 @@
 
 ### .\venv\Scripts\Activate
 
+### pip install -r .\requirement.txt
