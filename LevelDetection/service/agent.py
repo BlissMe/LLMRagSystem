@@ -4,8 +4,12 @@ import re
 import json
 from typing import Dict, Any
 from groq import Groq
+from dotenv import load_dotenv 
+
+load_dotenv()
 
 MODEL_NAME = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
 
 class AgentError(Exception):
     pass
