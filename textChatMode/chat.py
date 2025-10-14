@@ -165,7 +165,8 @@ Now reply like a kind friend:
         "response": final_text,
         "audio_url": f"/voice-audio?path={audio_path}",  
         "phq9_questionID": matched_q["id"] if matched_q else None,
-        "phq9_question": matched_q["question"] if matched_q else None
+        "phq9_question": matched_q["question"] if matched_q else None,
+        "lanuage": "English"
     }
     
 @router.get("/voice-audio")

@@ -12,6 +12,7 @@ from voiceChatMode.voice import router as voice_router
 from LevelDetection.router.levelDetection import router as level_detection_router
 from textChatMode.assesmentAgent.routes import router as agent_router
 from CountingGame.game import router as game_router
+from Sinhala.chat_si import router as chat_router
 
 app = FastAPI()
  
@@ -31,7 +32,7 @@ app.include_router(voice_router)
 app.include_router(level_detection_router)
 app.include_router(agent_router)
 app.include_router(game_router)
-
+app.include_router(chat_router) 
 
 @app.get("/")
 def root():

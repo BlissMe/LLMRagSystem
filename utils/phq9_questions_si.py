@@ -1,4 +1,4 @@
-PHQ9_QUESTIONS_SI = [
+PHQ9_QUESTIONS = [
     {"id": 1, "question": "ඔබට දේවල් කිරීමට එතරම් උනන්දුවක් හෝ සතුටක් දැනෙන්නේ නැද්ද?", "meaning": "Loss of interest or pleasure"},
     {"id": 2, "question": "ඔබට මානසික අවපීඩනයක් හෝ බලාපොරොත්තු රහිත බවක් දැනෙනවාද?", "meaning": "Feeling down, depressed, or hopeless"},
     {"id": 3, "question": "ඔබට නිදාගැනීමට අපහසු වීම, නින්ද පවත්වා ගැනීමට අපහසු වීම, හෝ ඉතා වැඩි ලෙස නින්ද යෑම සිදුවුණාද?", "meaning": "Trouble falling asleep, staying asleep, or sleeping too much"},

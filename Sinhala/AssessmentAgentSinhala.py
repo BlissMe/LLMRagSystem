@@ -1,16 +1,16 @@
 # agent/agent.py
 from pydantic import BaseModel
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import json
 from pymongo import MongoClient
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_mongodb import MongoDBAtlasVectorSearch
 
-from utils.phq9_questions import PHQ9_QUESTIONS
+from utils.phq9_questions_si import PHQ9_QUESTIONS
 from utils.tts import generate_tts_audio
 import key_param
 
-MODEL_NAME = "gpt-3.5-turbo"  # keep pluggable
+MODEL_NAME = "gpt-4-turbo"  # keep pluggable
 
 class AgentState(BaseModel):
     query: str
@@ -27,7 +27,12 @@ class DepressionAgent:
         self.collection_name = collection_name
         self.index_name = index_name
 
-        self.llm = ChatOpenAI(model=MODEL_NAME, openai_api_key=key_param.openai_api_key, temperature=0.7)
+        # ✅ No system_message here
+        self.llm = ChatOpenAI(
+            model=MODEL_NAME,
+            openai_api_key=key_param.openai_api_key,
+            temperature=0.7,
+        )
         self.embedding = OpenAIEmbeddings(openai_api_key=key_param.openai_api_key)
 
     def _user_turns_lt3(self, history: str) -> bool:
@@ -74,11 +79,13 @@ Early stage: {state.early_stage}
 Asked PHQ IDs: {state.asked_phq_ids}
 History (truncated): {state.history[-1500:]}
 """
-        resp = self.llm.invoke([{"role": "user", "content": plan_prompt}])
+        resp = self.llm.invoke([
+            {"role": "system", "content": "ඔබේ සියලු පිළිතුරු සිංහලෙන් (Sinhala language) ලබා දෙන්න."},
+            {"role": "user", "content": plan_prompt}
+        ])
         txt = resp.content.strip()
-        # be defensive: try to parse JSON, fallback defaults
+
         try:
-            # try to extract a JSON object even if there's extra text
             start = txt.find("{")
             end = txt.rfind("}")
             if start != -1 and end != -1:
@@ -86,16 +93,12 @@ History (truncated): {state.history[-1500:]}
             plan = json.loads(txt)
         except Exception:
             plan = {"do_rag": False, "ask_phq9": not state.early_stage}
-        # Hard rule: never ask PHQ in early stage
+
         if state.early_stage:
             plan["ask_phq9"] = False
         return {"do_rag": bool(plan.get("do_rag")), "ask_phq9": bool(plan.get("ask_phq9"))}
 
-    def _compose_reply(
-        self,
-        state: AgentState,
-        next_phq: Optional[dict]
-    ) -> str:
+    def _compose_reply(self, state: AgentState, next_phq: Optional[dict]) -> str:
         summary_text = "\n".join(state.summaries) if state.summaries else "No previous summaries available."
         phq_instruction = ""
 
@@ -126,7 +129,6 @@ Let user respond with:
 - nearly every day
 """
 
-        # Final response prompt
         chat_prompt = f"""
 You are a warm, caring friend. Keep replies SHORT, non-repetitive, one question per message.
 NEVER mention "PHQ-9" by name. Avoid medical/crisis terms unless asked.
@@ -146,7 +148,11 @@ User just said: "{state.query}"
 
 Now reply like a kind friend in 1–3 short sentences. If you asked a question above, do not add extra ones.
 """
-        resp = self.llm.invoke([{"role": "system", "content": chat_prompt}])
+
+        resp = self.llm.invoke([
+            {"role": "system", "content": "ඔබේ සියලු පිළිතුරු සිංහලෙන් (Sinhala language) ලබා දෙන්න."},
+            {"role": "system", "content": chat_prompt}
+        ])
         return resp.content.strip()
 
     def run(self, query: str, history: str, summaries: List[str], asked_phq_ids: List[int]) -> dict:
@@ -168,7 +174,6 @@ Now reply like a kind friend in 1–3 short sentences. If you asked a question a
 
         reply_text = self._compose_reply(st, next_q)
 
-        # TTS
         audio_path = generate_tts_audio(reply_text)
 
         return {
@@ -176,5 +181,5 @@ Now reply like a kind friend in 1–3 short sentences. If you asked a question a
             "audio_url": f"/voice-audio?path={audio_path}",
             "phq9_questionID": (next_q["id"] if next_q else None),
             "phq9_question": (next_q["question"] if next_q else None),
-            "language": "English"
+            "language": "Sinhala"
         }
