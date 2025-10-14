@@ -15,6 +15,7 @@ from CountingGame.game import router as game_router
 
 app = FastAPI()
  
+ 
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
