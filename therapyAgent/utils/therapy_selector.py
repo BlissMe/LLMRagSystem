@@ -4,7 +4,7 @@ def get_therapy_recommendation(db, depression_level, history_records):
     """
     Select therapy based on depression level and past usage.
     """
-    therapy_collection = db["TherapyList"]
+    therapy_collection = db["Therapies"]
 
     # filter by level
     query = {"level": {"$in": [depression_level.lower(), "general"]}}
@@ -18,4 +18,4 @@ def get_therapy_recommendation(db, depression_level, history_records):
     available = [t for t in all_therapies if str(t["_id"]) not in used_ids]
 
     selected = random.choice(available or all_therapies)
-    return {"id": str(selected["_id"]), "name": selected["name"], "description": selected["description"]}
+    return {"id": str(selected["_id"]), "name": selected["name"], "description": selected["description"],"path": selected.get("path")}

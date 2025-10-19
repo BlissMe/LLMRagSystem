@@ -23,7 +23,7 @@ async def therapy_chat(data: TherapyRequest):
     """
 
     client = MongoClient(key_param.MONGO_URI)
-    db = client["Therapy_System"]
+    db = client["blissMe"]
 
     # 🩺 Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
@@ -61,6 +61,13 @@ User message: "{data.user_query}"
 
     reply_text = response.content.strip()
     action_detected = None
+    is_therapy_suggested = False  
+
+    
+    if f"start the {therapy_suggestion['name']} therapy" in reply_text.lower():
+        is_therapy_suggested = True
+
+   
     if "ACTION:START_THERAPY" in reply_text:
         action_detected = reply_text.split("ACTION:START_THERAPY:")[-1].strip()
         save_therapy_history(
@@ -70,12 +77,17 @@ User message: "{data.user_query}"
             therapy_suggestion["name"],
             therapy_suggestion["id"]
         )
+        is_therapy_suggested = False 
+
 
     client.close()
 
     return {
-        "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
-        "action": "START_THERAPY" if action_detected else None,
-        "therapy_id": action_detected,
-        "therapy_name": therapy_suggestion["name"] if action_detected else None,
-    }
+    "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
+    "action": "START_THERAPY" if action_detected else None,
+    "therapy_id": action_detected,
+    "therapy_name": therapy_suggestion["name"] if action_detected else None,
+    "therapy_path": therapy_suggestion.get("path"),  
+    "isTherapySuggested": is_therapy_suggested, 
+}
+
