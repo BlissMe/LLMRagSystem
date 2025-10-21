@@ -83,50 +83,55 @@ async def ask_question(data: QueryRequest):
     context_texts = [doc.page_content[:500] for doc in similar_docs]
     summary_text = "\n".join(data.summaries) if data.summaries else "No previous summaries available."
 
-    unasked_questions = [q for q in PHQ9_QUESTIONS if q["id"] not in data.asked_phq_ids]
-    next_phq_q = unasked_questions[0] if unasked_questions else None
+    user_turns = [l for l in data.history.splitlines() if l.lower().startswith(("you:", "user:"))]
+    early_stage = len(user_turns) < 3  # start PHQ only after 3 chats
 
-    # Determine if we are in early stage (first 2 turns)
-    user_turns = [line for line in data.history.splitlines() if line.lower().startswith("you:") or line.lower().startswith("user:")]
-    early_stage = len(user_turns) < 3
-    
+    unasked = [q for q in PHQ9_QUESTIONS if q["id"] not in data.asked_phq_ids]
+    next_q = unasked[0] if unasked else None
+
+# Only enable PHQ mode if user has chatted at least 3 times
+    phq_mode = False
+    if not early_stage and next_q:
+      phq_mode = True
+
+    # --- Build PHQ instruction if needed ---
     phq_instruction = ""
-    if next_phq_q and not early_stage:
+    if phq_mode:
         if not data.asked_phq_ids:
-            phq_instruction += f"""
-You may now gently say something like:
-"To better understand how you're doing, I'd like to ask a few short questions on how you feel in past two weeks."
-
-Then ask this question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
+            # Before first PHQ question
+            phq_instruction = (
+                "You may now gently say something like:\n"
+                '"To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."\n'
+                "Then ask this first question exactly as shown (do NOT paraphrase):\n"
+                f'- "{next_q["meaning"]}"\n\n'
+                "After the user replies, respond with one short caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”) and move to the next PHQ-9 question in order.\n"
+                "Ask only one PHQ question per message.\n"
+                "User can reply with: not at all, several days, more than half the days, nearly every day."
+            )
         else:
-            phq_instruction += f"""
-Continue with the next question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
-
-        phq_instruction += """
-Make your response short and caring. Don't explain too much. No repetition. Only ask one PHQ-9 question per message.
-Let user respond with:
-- not at all
-- several days
-- more than half the days
-- nearly every day
-"""
+            # For later PHQ questions
+            phq_instruction = (
+                "Respond with one short caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”) acknowledging the user’s last answer, then immediately ask the next PHQ-9 question exactly as shown below (do NOT paraphrase):\n"
+                f'- "{next_q["meaning"]}"\n\n'
+                "Do not add unrelated or extra questions.\n"
+                "Ask only one PHQ question per message.\n"
+                "User can reply with: not at all, several days, more than half the days, nearly every day."
+            )
 
     chat_prompt = f"""
 You are a friendly chatbot who talks like a kind friend.
 
-Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
+- Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
 
-Your job is to gently explore how the user feels and try to understand user by asking questions, and ask PHQ-9 questions naturally when ready.
+- Your job is to gently explore how the user feels and try to understand user by asking questions.
 
-NEVER mention PHQ-9 or say "I cannot help you".
+- NEVER mention PHQ-9 or say "I cannot help you".
 
-Avoid medical or crisis terms unless directly asked.
+- Avoid medical or crisis terms unless directly asked.
 
-Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
+- Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
+
+- After finishing all 9, continue chatting normally with care and empathy.
 
 Past summaries:
 {summary_text}
@@ -137,6 +142,7 @@ Relevant context:
 Conversation history:
 {history}
 
+{phq_mode}
 {phq_instruction}
 
 User just said: "{query}"
@@ -151,12 +157,15 @@ Now reply like a kind friend:
     )
 
     chat_response = bot.invoke([
-        {"role": "system", "content": chat_prompt}
+        {"role": "system", "content": chat_prompt }
     ])
     final_text = chat_response.content.strip()
     client.close()
 
-    matched_q = next_phq_q if not early_stage else None
+    matched_q = next_q if phq_mode else None
+    if not unasked:  # all 9 done
+        matched_q = None
+        phq_mode = False
 
 
     audio_path = generate_tts_audio(final_text)
