@@ -100,11 +100,11 @@ async def ask_question(data: QueryRequest):
         if not data.asked_phq_ids:
             # Before first PHQ question
             phq_instruction = (
-                "You may now gently say something like:\n"
+                "You MUST now gently say something like:\n"
                 '"To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."\n'
-                "Then ask this first question exactly as shown (do NOT paraphrase):\n"
+                "Then ask this first question EXACTLY as shown (do NOT paraphrase):\n"
                 f'- "{next_q["meaning"]}"\n\n'
-                "After the user replies, respond with one short caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”/ “I’m here for you.”) and move to the next PHQ-9 question in order.\n"
+                "After the user replies, respond with ONE SHORT caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”/ “I’m here for you.”) and move to the next PHQ-9 question in order EXACTLY as shown .\n"
                 "Ask only one PHQ question per message.\n"
                 "User can reply with: not at all, several days, more than half the days, nearly every day."
             )
@@ -128,10 +128,11 @@ You are a friendly chatbot who talks like a kind friend.
 - NEVER mention PHQ-9 or say "I cannot help you".
 
 - Avoid medical or crisis terms unless directly asked.
+- Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
 
 -before starting phq-9, need to ask at least 3 normal chat turns.
--then when starting phq-9, before first question, gently inform user about the questions like "To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."
-- Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
+-then when starting phq-9, before first question, you MUST gently inform user about the questions like "To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."
+ - Ask all 9 PHQ-9 questions in order, one at a time, exactly given as in the phq_instruction.
 
 - After finishing all 9, continue chatting normally with care and empathy.
 
