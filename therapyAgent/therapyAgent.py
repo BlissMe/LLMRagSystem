@@ -14,6 +14,7 @@ class TherapyRequest(BaseModel):
     depression_level: str
     user_id: str
     session_id: str
+    session_summaries: list[str] = []
 
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
@@ -25,22 +26,27 @@ async def therapy_chat(data: TherapyRequest):
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
 
-    # 🩺 Fetch therapy history
+    # Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
     recent_history = "\n".join(
         [f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)" for h in history_records]
     ) if history_records else "No prior therapies found."
 
-    # 🧘 Suggest new therapy
+    #  Suggest new therapy
     therapy_suggestion = get_therapy_recommendation(db, data.depression_level, history_records)
 
-    # 🧠 Base prompt
+    
+
+    # Base prompt
     prompt = f"""
 You are a friendly therapy assistant designed to support users with {data.depression_level} depression.
-You talk like a warm and caring friend. don't always suggest therapies, suggestwhen appropriate based on the user's emotional state other times keep chatting as caring friend BUT your main duty is suggesting therapies.
+You talk like a warm and caring friend. don't always suggest therapies, suggestwhen appropriate based on the user's emotional state other times KEEP CHATTING as caring friend BUT your main duty is suggesting therapies.
 
 Current user history:
 {recent_history}
+
+Previous session summaries (if any):
+{data.session_summaries or "No previous summaries available."}
 
 If the user has moderate or minimal depression, suggest small helpful activities or therapies from the system.
 Therapies can include relaxation breathing, mindfulness, journaling, or gratitude reflection.
@@ -54,7 +60,7 @@ If a therapy matches one from the system, gently ask:
 If the user agrees, return:
 ACTION:START_THERAPY:{therapy_suggestion['id']}
 
-Otherwise, continue gentle conversation and emotional support.
+Otherwise, CONTINUE gentle conversation and emotional support.
 
 User message: "{data.user_query}"
 """
