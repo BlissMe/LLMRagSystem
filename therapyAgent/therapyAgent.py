@@ -35,8 +35,6 @@ async def therapy_chat(data: TherapyRequest):
     #  Suggest new therapy
     therapy_suggestion = get_therapy_recommendation(db, data.depression_level, history_records)
 
-    
-
     # Base prompt
     prompt = f"""
 You are a friendly therapy assistant designed to support users with {data.depression_level} depression.
@@ -44,9 +42,6 @@ You talk like a warm and caring friend. don't always suggest therapies, suggestw
 
 Current user history:
 {recent_history}
-
-Previous session summaries (if any):
-{data.session_summaries or "No previous summaries available."}
 
 If the user has moderate or minimal depression, suggest small helpful activities or therapies from the system.
 Therapies can include relaxation breathing, mindfulness, journaling, or gratitude reflection.
@@ -60,7 +55,7 @@ If a therapy matches one from the system, gently ask:
 If the user agrees, return:
 ACTION:START_THERAPY:{therapy_suggestion['id']}
 
-Otherwise, CONTINUE gentle conversation and emotional support.
+Otherwise, continue gentle conversation and emotional support.
 
 User message: "{data.user_query}"
 """
