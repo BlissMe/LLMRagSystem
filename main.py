@@ -6,13 +6,12 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) 
 
 #from textChatMode.chat import router as ask_router
-#from textChatMode.chatmistral import router as ask_router
+##from textChatMode.chatmistral import router as ask_router
 from voiceChatMode.voice import router as voice_router
 #from face_recognition_auth.auth_face_recognition import router as face_router
 from LevelDetection.router.levelDetection import router as level_detection_router
 from textChatMode.assesmentAgent.routes import router as agent_router
 from CountingGame.game import router as game_router
-from Sinhala.chat_si import router as chat_router
 from MonitoringAgent.monitor_api import router as monitor_router
 
 
@@ -34,7 +33,7 @@ app.include_router(voice_router)
 app.include_router(level_detection_router)
 app.include_router(agent_router)
 app.include_router(game_router)
-app.include_router(chat_router) 
+
 app.include_router(monitor_router)
 
 
