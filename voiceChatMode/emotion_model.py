@@ -6,6 +6,12 @@ from transformers import Wav2Vec2Processor, Wav2Vec2Model
 from io import BytesIO
 import librosa
 import os
+from huggingface_hub import hf_hub_download
+
+# === Globals for lazy loading ===
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = None
+processor = None
 
 # Define emotions
 emotions = ['angry', 'sad', 'neutral', 'happy', 'fearful']
@@ -17,8 +23,7 @@ class EmotionClassifier(nn.Module):
     def __init__(self, num_labels):
         super(EmotionClassifier, self).__init__()
 
-
-        MODEL_PATH = os.path.join("voiceChatMode", "wav2vec2_model", "wav2vec2_model")
+        MODEL_PATH = "ImashaNawodi/my-wav2vec2-emotion"
         self.wav2vec2 = Wav2Vec2Model.from_pretrained(MODEL_PATH)
         self.dropout = nn.Dropout(0.3)
         self.fc_audio = nn.Linear(self.wav2vec2.config.hidden_size, 128)
@@ -34,19 +39,23 @@ class EmotionClassifier(nn.Module):
         logits = self.fc_combined(combined)
         return logits
 
-# === Load Model ===
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = EmotionClassifier(num_labels=len(emotions)).to(device)
-model.load_state_dict(torch.load("voiceChatMode/model_checkpoints/best_model_v3.pth", map_location=device))
-model.eval()
-
-# === Load Processor ===
-processor = Wav2Vec2Processor.from_pretrained("voiceChatMode/wav2vec2_model/wav2vec2_model")
-
-# === Predict Function ===
-import traceback
-
+# === Predict Function with lazy loading ===
 def predict_emotion(wav_io: BytesIO) -> str:
+    global model, processor
+
+    # Lazy load model and processor only on first call
+    if model is None or processor is None:
+        model = EmotionClassifier(num_labels=len(emotions)).to(device)
+
+        checkpoint_path = hf_hub_download(
+            repo_id="ImashaNawodi/my-wav2vec2-emotion",
+            filename="best_model_v3.pth"
+        )
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        model.eval()
+
+        processor = Wav2Vec2Processor.from_pretrained("ImashaNawodi/my-wav2vec2-emotion")
+
     try:
         print("Reading audio from BytesIO...")
         wav_io.seek(0)
@@ -100,5 +109,5 @@ def predict_emotion(wav_io: BytesIO) -> str:
     except Exception as e:
         print("Error during prediction:")
         import traceback
-        traceback.print_exc()  
+        traceback.print_exc()
         return "Error"
