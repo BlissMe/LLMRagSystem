@@ -8,6 +8,8 @@ from utils.phq9_questions import PHQ9_QUESTIONS
 from utils.tts import generate_tts_audio 
 import key_param
 from fastapi.responses import FileResponse
+from datetime import datetime
+import requests
 
 router = APIRouter()
 
@@ -61,6 +63,8 @@ class QueryRequest(BaseModel):
     history: str
     summaries: list[str] = []
     asked_phq_ids: list[int] = []
+    user_id: int
+    session_id: int
 
 @router.post("/ask")
 async def ask_question(data: QueryRequest):
@@ -161,12 +165,56 @@ Now reply like a kind friend:
 
     audio_path = generate_tts_audio(final_text)
 
+    # ----------------------
+    # PHQ-9 Progress
+    # ----------------------
+    total_phq9 = len(PHQ9_QUESTIONS)
+    answered_phq9 = len(data.asked_phq_ids)
+    phq9_progress = round((answered_phq9 / total_phq9) * 100, 2)
+    phq9_started = bool(data.asked_phq_ids)
+    phq9_completed = not unasked_questions
+
+    # ----------------------
+    # Send activity log to Monitor Agent
+    # ----------------------
+    try:
+        monitor_payload = {
+            "agent_name": "chat",
+            "user_id": data.user_id,
+            "session_id": data.session_id,
+            "input_data": {
+                "user_query": query,
+                "history": history,
+                "summaries": data.summaries,
+                "asked_phq_ids": data.asked_phq_ids
+            },
+            "output_data": {
+                "response": final_text,
+                "phq9_questionID": matched_q["id"] if matched_q else None,
+                "phq9_question": matched_q["question"] if matched_q else None,
+                "phq9_started": phq9_started,
+                "phq9_completed": phq9_completed,
+                "phq9_progress": phq9_progress
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        response = requests.post(
+            "http://localhost:8000/monitor-agent/track-activity",
+            json=monitor_payload,
+            timeout=15
+        )
+        print("✅ Logged chat activity to Monitor Agent:", response)
+    except Exception as e:
+        print("⚠️ Failed to send log to Monitor Agent:", e)
+
     return {
         "response": final_text,
-        "audio_url": f"/voice-audio?path={audio_path}",  
+        "audio_url": f"/voice-audio?path={audio_path}",
         "phq9_questionID": matched_q["id"] if matched_q else None,
         "phq9_question": matched_q["question"] if matched_q else None,
-        "lanuage": "English"
+        "phq9_progress": phq9_progress,
+        "language": "English"
     }
     
 @router.get("/voice-audio")
