@@ -14,7 +14,7 @@ from LevelDetection.router.levelDetection import router as level_detection_route
 from CountingGame.game import router as game_router
 from MonitoringAgent.monitor_api import router as monitor_router
 from therapyAgent.therapyAgent import router as therapy_router
-
+from monitoringAgentSystem.monotoring_agent_system import router as monitoring_router
 app = FastAPI()
  
 # Enable CORS
@@ -35,6 +35,9 @@ app.include_router(level_detection_router)
 app.include_router(game_router)
 app.include_router(monitor_router)
 app.include_router(therapy_router)
+app.include_router(monitoring_router)
+
+
 
 @app.get("/")
 def root():
