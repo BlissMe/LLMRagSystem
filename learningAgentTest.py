@@ -29,7 +29,6 @@ with MongoClient(key_param.MONGO_URI) as client:
     print("\n📄 Stored Document Content:\n", doc["content"])
     assert "[email_removed]" in doc["content"], "❌ Email was not anonymized!"
 
-
 # ---------- STEP 3: Apply feedback ----------
 feedback = agent.apply_feedback(
     doc_id=doc["_id"],
