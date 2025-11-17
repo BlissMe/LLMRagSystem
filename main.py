@@ -37,8 +37,6 @@ app.include_router(monitor_router)
 app.include_router(therapy_router)
 app.include_router(monitoring_router)
 
-
-
 @app.get("/")
 def root():
-    return {"message": "All endpoints loaded successfully"}
+    return {"message": "All endpoints are loaded successfully"}
