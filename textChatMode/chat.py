@@ -139,20 +139,9 @@ Relevant context:
 {context_texts}
 
 Conversation history:
-{history}
 
 {phq_instruction}
 
-User just said: "{query}"
-
-Now reply like a kind friend:
-"""
-
-    bot = ChatOpenAI(
-        model="gpt-3.5-turbo",
-        openai_api_key=key_param.openai_api_key,
-        temperature=0.7
-    )
 
     chat_response = bot.invoke([
         {"role": "system", "content": chat_prompt}
