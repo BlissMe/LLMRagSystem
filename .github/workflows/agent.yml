@@ -26,4 +26,5 @@ jobs:
         run: |
           git remote add hf https://ImashaNawodi:$HF_TOKEN@huggingface.co/spaces/ImashaNawodi/learning_Agent
           
+          # Force push GitHub's learning_agent → HuggingFace main
           git push hf learning_agent:main --force
