@@ -13,38 +13,15 @@ import requests
 
 router = APIRouter()
 
-from difflib import SequenceMatcher
-
-# # for session summary
-# class SummaryRequest(BaseModel):
-#     history: str
-
-# @router.post("/summarize")
-# async def summarize_chat(data: SummaryRequest):
-#     print("Received /summarize request with history length:", len(data.history))
-
-#     summary_prompt = f"""
-# You are a helpful assistant. Summarize the following chat conversation between a user and a bot.
-
-# Chat:
-# {data.history}
-
-# Provide a short, clear summary:
-# """
-
-#     summarizer = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
-#     response = summarizer.invoke([{"role": "user", "content": summary_prompt}])
-
-#     return { "summary": response.content.strip() }
-
+# ----------------------
+# Summarize Endpoint
+# ----------------------
 class SummaryRequest(BaseModel):
     history: str
 
 @router.post("/summarize")
 async def summarize_chat(data: SummaryRequest):
     print("Received /summarize request with history length:", len(data.history))
-
-    # Join lines into one paragraph without altering the original words.
     paragraph = (
         data.history
         .replace("\r\n", " ")
@@ -52,12 +29,12 @@ async def summarize_chat(data: SummaryRequest):
         .replace("\r", " ")
         .strip()
     )
-
-    # Keep the same response shape to avoid frontend changes.
     return {"summary": paragraph}
 
 
-# for chat queries
+# ----------------------
+# Ask Endpoint
+# ----------------------
 class QueryRequest(BaseModel):
     user_query: str
     history: str
@@ -71,7 +48,9 @@ async def ask_question(data: QueryRequest):
     query = data.user_query
     history = data.history
 
+    # ----------------------
     # MongoDB Setup
+    # ----------------------
     client = MongoClient(key_param.MONGO_URI)
     db = client["Depression_Knowledge_Base"]
     collection = db["depression"]
@@ -83,17 +62,21 @@ async def ask_question(data: QueryRequest):
         embedding=embedding,
         index_name=index_name
     )
+
     similar_docs = vectorstore.similarity_search(query, k=3)
     context_texts = [doc.page_content[:500] for doc in similar_docs]
     summary_text = "\n".join(data.summaries) if data.summaries else "No previous summaries available."
 
+    # ----------------------
+    # PHQ-9 Question Selection
+    # ----------------------
     unasked_questions = [q for q in PHQ9_QUESTIONS if q["id"] not in data.asked_phq_ids]
     next_phq_q = unasked_questions[0] if unasked_questions else None
 
     # Determine if we are in early stage (first 2 turns)
     user_turns = [line for line in data.history.splitlines() if line.lower().startswith("you:") or line.lower().startswith("user:")]
     early_stage = len(user_turns) < 3
-    
+
     phq_instruction = ""
     if next_phq_q and not early_stage:
         if not data.asked_phq_ids:
@@ -109,7 +92,6 @@ Then ask this question:
 Continue with the next question:
 - "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
 """
-
         phq_instruction += """
 Make your response short and caring. Don't explain too much. No repetition. Only ask one PHQ-9 question per message.
 Let user respond with:
@@ -119,6 +101,9 @@ Let user respond with:
 - nearly every day
 """
 
+    # ----------------------
+    # Chat Prompt
+    # ----------------------
     chat_prompt = f"""
 You are a friendly chatbot who talks like a kind friend.
 
@@ -139,9 +124,20 @@ Relevant context:
 {context_texts}
 
 Conversation history:
+{history}
 
 {phq_instruction}
 
+User just said: "{query}"
+
+Now reply like a kind friend:
+"""
+
+    bot = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        openai_api_key=key_param.openai_api_key,
+        temperature=0.7
+    )
 
     chat_response = bot.invoke([
         {"role": "system", "content": chat_prompt}
@@ -150,7 +146,6 @@ Conversation history:
     client.close()
 
     matched_q = next_phq_q if not early_stage else None
-
 
     audio_path = generate_tts_audio(final_text)
 
@@ -205,7 +200,11 @@ Conversation history:
         "phq9_progress": phq9_progress,
         "language": "English"
     }
-    
+
+
+# ----------------------
+# Voice Audio Endpoint
+# ----------------------
 @router.get("/voice-audio")
 def voice_audio(path: str):
-    return FileResponse(path, media_type="audio/mpeg", filename="bot_reply.mp3")     
+    return FileResponse(path, media_type="audio/mpeg", filename="bot_reply.mp3")  
