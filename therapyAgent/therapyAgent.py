@@ -16,6 +16,20 @@ class TherapyRequest(BaseModel):
     session_id: str
     session_summaries: list[str] = []
 
+# ----------------------------------------------------------------------
+# ⭐ UTILITY — SAVE EVENT TO MONITORING COLLECTION
+# ----------------------------------------------------------------------
+def save_event(db, session_id, event_type, detail=None):
+    event_doc = {
+        "session_id": session_id,
+        "event": event_type,
+        "detail": detail,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    db.session_events.insert_one(event_doc)
+# ----------------------------------------------------------------------
+
+
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
     """
@@ -25,6 +39,16 @@ async def therapy_chat(data: TherapyRequest):
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
+
+    # ----------------------------------------------------------------------
+    # ⭐ MONITORING: Save user message
+    # ----------------------------------------------------------------------
+    save_event(
+        db,
+        data.session_id,
+        "user_message",
+        {"text": data.user_query}
+    )
 
     # Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
@@ -71,7 +95,20 @@ User message: "{data.user_query}"
     if f"start the {therapy_suggestion['name']} therapy" in reply_text.lower():
         is_therapy_suggested = True
 
-   
+        # ----------------------------------------------------------------------
+        # ⭐ MONITORING: Log therapy suggestion
+        # ----------------------------------------------------------------------
+        save_event(
+            db,
+            data.session_id,
+            "therapy_suggested",
+            {
+                "therapy_name": therapy_suggestion["name"],
+                "therapy_id": therapy_suggestion["id"]
+            }
+        )
+
+    # Detect ACTION command
     if "ACTION:START_THERAPY" in reply_text:
         action_detected = reply_text.split("ACTION:START_THERAPY:")[-1].strip()
         save_therapy_history(
@@ -81,17 +118,33 @@ User message: "{data.user_query}"
             therapy_suggestion["name"],
             therapy_suggestion["id"]
         )
-        is_therapy_suggested = False 
 
+        save_event(
+            db,
+            data.session_id,
+            "therapy_started",
+            {
+                "therapy_name": therapy_suggestion["name"],
+                "therapy_id": therapy_suggestion["id"]
+            }
+        )
+
+        is_therapy_suggested = False
+
+    save_event(
+        db,
+        data.session_id,
+        "bot_message",
+        {"text": reply_text}
+    )
 
     client.close()
 
     return {
-    "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
-    "action": "START_THERAPY" if action_detected else None,
-    "therapy_id": action_detected,
-    "therapy_name": therapy_suggestion["name"] if action_detected else None,
-    "therapy_path": therapy_suggestion.get("path"),  
-    "isTherapySuggested": is_therapy_suggested, 
-}
-
+        "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
+        "action": "START_THERAPY" if action_detected else None,
+        "therapy_id": action_detected,
+        "therapy_name": therapy_suggestion["name"] if action_detected else None,
+        "therapy_path": therapy_suggestion.get("path"),
+        "isTherapySuggested": is_therapy_suggested
+    }
