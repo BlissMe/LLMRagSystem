@@ -39,9 +39,10 @@ async def therapy_chat(data: TherapyRequest):
         db, data.depression_level, history_records
     )
 
-    therapy_name = therapy_suggestion.get["name"]
-    therapy_id = therapy_suggestion.get["id"]
+    therapy_name = therapy_suggestion.get("name")
+    therapy_id = therapy_suggestion.get("id")
     therapy_path = therapy_suggestion.get("path", None)
+    therapy_description = therapy_suggestion.get("description", "")
 
     # =======================
     #       BASE PROMPT
@@ -116,8 +117,9 @@ User message: "{data.user_query}"
     return {
         "response": response.content.replace("ACTION:START_THERAPY", "").strip(),
         "action": "START_THERAPY" if action_detected else None,
-        "therapy_id": therapy_id if action_detected else None,
-        "therapy_name": therapy_name if action_detected else None,
+        "therapy_id": therapy_id if (action_detected or is_therapy_suggested) else None,
+        "therapy_name": therapy_name if (action_detected or is_therapy_suggested) else None,
+        "therapy_description": therapy_description if (action_detected or is_therapy_suggested) else None,
         "therapy_path": therapy_path,
         "isTherapySuggested": is_therapy_suggested,
         "therapySuggestion": {
