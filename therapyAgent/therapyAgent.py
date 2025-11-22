@@ -11,6 +11,47 @@ from .utils.history_tracker import save_therapy_history, get_user_therapy_histor
 
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
 
+class TherapyFeedback(BaseModel):
+    user_id: int
+    session_id: int | None = None
+    therapy_id: str
+    duration: float  | None = None
+    feedback: str | None = None
+
+@router.post("/feedback")
+async def save_therapy_feedback(data: TherapyFeedback):
+
+    client = MongoClient(key_param.MONGO_URI)
+    db = client["blissMe"]
+
+    history_collection = db["TherapyHistory"]
+
+    # Update the latest therapy session
+    history_collection.update_one(
+        {
+            "user_id": data.user_id,
+            "session_id": data.session_id,
+            "therapy_id": data.therapy_id
+        },
+        {
+            "$set": {
+                "duration": data.duration,
+                "feedback": data.feedback,
+                "feedback_time": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "user_id": data.user_id,
+                "session_id": data.session_id,
+                "therapy_id": data.therapy_id
+            }
+        },
+        upsert=True
+    )
+
+    client.close()
+
+    return {"success": True, "message": "Therapy feedback saved"}
+
 class TherapyRequest(BaseModel):
     user_query: str
     depression_level: str
@@ -105,6 +146,8 @@ User message: "{data.user_query}"
             data.session_id,
             therapy_name,
             therapy_id,
+            duration=None,
+            feedback=None
         )
         is_therapy_suggested = False  # because user already started
 
