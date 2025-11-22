@@ -4,8 +4,27 @@ from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from datetime import datetime
 import key_param
+import re
+
 from .utils.therapy_selector import get_therapy_recommendation
 from .utils.history_tracker import save_therapy_history, get_user_therapy_history
+
+# =============== MONITOR AGENT CLIENT ===============
+import httpx
+
+async def log_to_monitor(event_type: str, payload: dict):
+    """Send event to Monitor Agent"""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{key_param.MONITOR_AGENT_URL}/log",
+                json={"event_type": event_type, "payload": payload},
+                timeout=5
+            )
+    except Exception as e:
+        print("⚠ Monitor Agent Logging Error:", e)
+
+# ====================================================
 
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
 
@@ -16,70 +35,61 @@ class TherapyRequest(BaseModel):
     session_id: str
     session_summaries: list[str] = []
 
-# ----------------------------------------------------------------------
-# ⭐ UTILITY — SAVE EVENT TO MONITORING COLLECTION
-# ----------------------------------------------------------------------
-def save_event(db, session_id, event_type, detail=None):
-    event_doc = {
-        "session_id": session_id,
-        "event": event_type,
-        "detail": detail,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    db.session_events.insert_one(event_doc)
-# ----------------------------------------------------------------------
-
 
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
-    """
-    Therapy Agent main route:
-    Handles chat, suggests therapies, tracks user progress.
-    """
+
+    # ======= MONITOR: Request received ============
+    await log_to_monitor("THERAPY_AGENT_REQUEST", {
+        "user_id": data.user_id,
+        "session_id": data.session_id,
+        "user_query": data.user_query,
+        "depression_level": data.depression_level,
+    })
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
 
-    # ----------------------------------------------------------------------
-    # ⭐ MONITORING: Save user message
-    # ----------------------------------------------------------------------
-    save_event(
-        db,
-        data.session_id,
-        "user_message",
-        {"text": data.user_query}
-    )
-
-    # Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
     recent_history = "\n".join(
-        [f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)" for h in history_records]
+        [
+            f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)"
+            for h in history_records
+        ]
     ) if history_records else "No prior therapies found."
 
-    #  Suggest new therapy
-    therapy_suggestion = get_therapy_recommendation(db, data.depression_level, history_records)
+    therapy_suggestion = get_therapy_recommendation(
+        db, data.depression_level, history_records
+    )
 
-    # Base prompt
+    therapy_name = therapy_suggestion.get("name")
+    therapy_id = therapy_suggestion.get("id")
+    therapy_path = therapy_suggestion.get("path", None)
+
+    # ======= MONITOR: Therapy suggested ============
+    await log_to_monitor("THERAPY_SUGGESTION_COMPUTED", {
+        "user_id": data.user_id,
+        "session_id": data.session_id,
+        "therapy_id": therapy_id,
+        "therapy_name": therapy_name,
+    })
+
     prompt = f"""
-You are a friendly therapy assistant designed to support users with {data.depression_level} depression.
-You talk like a warm and caring friend. don't always suggest therapies, suggestwhen appropriate based on the user's emotional state other times KEEP CHATTING as caring friend BUT your main duty is suggesting therapies.
+You are a warm, friendly therapy assistant. 
+Your main job is to support the user emotionally AND suggest a therapy when appropriate.
 
-Current user history:
+Rules:
+- Keep responses short, caring, simple.
+- Never mention depression level.
+- Suggest therapies gently when appropriate.
+- If suggesting a therapy, ask:
+  "Would you like to start the {therapy_name} therapy now?"
+
+If the user agrees, you MUST respond with EXACT format:
+ACTION:START_THERAPY:{therapy_id}
+
+User history:
 {recent_history}
-
-If the user has moderate or minimal depression, suggest small helpful activities or therapies from the system.
-Therapies can include relaxation breathing, mindfulness, journaling, or gratitude reflection.
-don't use log sentences. keep it short and simple.
-don't mention about depression level or depression to the user.
-
-
-If a therapy matches one from the system, gently ask:
-"Would you like to start the {therapy_suggestion['name']} therapy now?"
-
-If the user agrees, return:
-ACTION:START_THERAPY:{therapy_suggestion['id']}
-
-Otherwise, continue gentle conversation and emotional support.
 
 User message: "{data.user_query}"
 """
@@ -87,64 +97,64 @@ User message: "{data.user_query}"
     bot = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
     response = bot.invoke([{"role": "user", "content": prompt}])
 
-    reply_text = response.content.strip()
-    action_detected = None
-    is_therapy_suggested = False  
+    reply_text = response.content.strip().lower()
 
-    
-    if f"start the {therapy_suggestion['name']} therapy" in reply_text.lower():
-        is_therapy_suggested = True
+    suggestion_phrases = [
+        f"start the {therapy_name.lower()} therapy",
+        f"try the {therapy_name.lower()} therapy",
+        f"{therapy_name.lower()} therapy now",
+    ]
 
-        # ----------------------------------------------------------------------
-        # ⭐ MONITORING: Log therapy suggestion
-        # ----------------------------------------------------------------------
-        save_event(
-            db,
-            data.session_id,
-            "therapy_suggested",
-            {
-                "therapy_name": therapy_suggestion["name"],
-                "therapy_id": therapy_suggestion["id"]
-            }
-        )
+    is_therapy_suggested = any(p in reply_text for p in suggestion_phrases)
 
-    # Detect ACTION command
-    if "ACTION:START_THERAPY" in reply_text:
-        action_detected = reply_text.split("ACTION:START_THERAPY:")[-1].strip()
+    action_pattern = r"action\s*:\s*start[_\- ]therapy\s*:\s*([A-Za-z0-9]+)"
+    match = re.search(action_pattern, reply_text, re.IGNORECASE)
+    action_detected = match.group(1).strip() if match else None
+
+    # ===============================
+    # ACTION DETECTED → start therapy
+    # ===============================
+    if action_detected:
+
         save_therapy_history(
             db,
             data.user_id,
             data.session_id,
-            therapy_suggestion["name"],
-            therapy_suggestion["id"]
+            therapy_name,
+            therapy_id,
         )
 
-        save_event(
-            db,
-            data.session_id,
-            "therapy_started",
-            {
-                "therapy_name": therapy_suggestion["name"],
-                "therapy_id": therapy_suggestion["id"]
-            }
-        )
+        # ======= MONITOR: Therapy started ============
+        await log_to_monitor("THERAPY_STARTED", {
+            "user_id": data.user_id,
+            "session_id": data.session_id,
+            "therapy_id": therapy_id,
+            "therapy_name": therapy_name,
+        })
 
         is_therapy_suggested = False
 
-    save_event(
-        db,
-        data.session_id,
-        "bot_message",
-        {"text": reply_text}
-    )
-
     client.close()
 
-    return {
-        "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
+    # ======= MONITOR: Response sent ============
+    await log_to_monitor("THERAPY_AGENT_RESPONSE", {
+        "user_id": data.user_id,
+        "session_id": data.session_id,
+        "response": response.content,
         "action": "START_THERAPY" if action_detected else None,
-        "therapy_id": action_detected,
-        "therapy_name": therapy_suggestion["name"] if action_detected else None,
-        "therapy_path": therapy_suggestion.get("path"),
-        "isTherapySuggested": is_therapy_suggested
+        "therapy_id": therapy_id if action_detected else None,
+    })
+
+    return {
+        "response": response.content.replace("ACTION:START_THERAPY", "").strip(),
+        "action": "START_THERAPY" if action_detected else None,
+        "therapy_id": therapy_id if action_detected else None,
+        "therapy_name": therapy_name if action_detected else None,
+        "therapy_path": therapy_path,
+        "isTherapySuggested": is_therapy_suggested,
+        "therapySuggestion": {
+            "id": therapy_id,
+            "name": therapy_name,
+            "path": therapy_path,
+        } if is_therapy_suggested else None,
     }

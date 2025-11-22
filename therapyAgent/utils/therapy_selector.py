@@ -83,7 +83,6 @@ default_therapies = [
     },
 ]
 
-
 def get_therapy_recommendation(db, depression_level, history_records):
     """
     Select therapy from default list based on depression level and past usage.
