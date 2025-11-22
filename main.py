@@ -5,6 +5,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) 
 
+#from textChatMode.chat import router as ask_router
 from textChatMode.chat import router as ask_router
 #from textChatMode.chatmistral import router as ask_router
 from voiceChatMode.voice import router as voice_router
