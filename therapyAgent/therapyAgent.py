@@ -5,47 +5,43 @@ from langchain_openai import ChatOpenAI
 from datetime import datetime
 import key_param
 import re
+import requests
 
 from .utils.therapy_selector import get_therapy_recommendation
 from .utils.history_tracker import save_therapy_history, get_user_therapy_history
 
-# =============== MONITOR AGENT CLIENT ===============
-import httpx
-
-async def log_to_monitor(event_type: str, payload: dict):
-    """Send event to Monitor Agent"""
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{key_param.MONITOR_AGENT_URL}/log",
-                json={"event_type": event_type, "payload": payload},
-                timeout=5
-            )
-    except Exception as e:
-        print("⚠ Monitor Agent Logging Error:", e)
-
-# ====================================================
-
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
+
+MONITOR_URL = "http://localhost:8000/monitor-agent/track-activity"
+
 
 class TherapyRequest(BaseModel):
     user_query: str
     depression_level: str
-    user_id: str
-    session_id: str
+    user_id: int
+    session_id: int
     session_summaries: list[str] = []
+
+def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: int):
+    payload = {
+        "agent_name": "therapy",
+        "user_id": user_id,
+        "session_id": session_id,
+        "input_data": {"event": event_name, **data.get("input", {})},
+        "output_data": data.get("output", {}),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    try:
+        requests.post(MONITOR_URL, json=payload, timeout=10)
+        print(f"Logged Therapy Event → {event_name}")
+    except Exception as e:
+        print("Monitor Agent Logging Failed:", e)
+
+
 
 
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
-
-    # ======= MONITOR: Request received ============
-    await log_to_monitor("THERAPY_AGENT_REQUEST", {
-        "user_id": data.user_id,
-        "session_id": data.session_id,
-        "user_query": data.user_query,
-        "depression_level": data.depression_level,
-    })
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
@@ -65,14 +61,6 @@ async def therapy_chat(data: TherapyRequest):
     therapy_name = therapy_suggestion.get("name")
     therapy_id = therapy_suggestion.get("id")
     therapy_path = therapy_suggestion.get("path", None)
-
-    # ======= MONITOR: Therapy suggested ============
-    await log_to_monitor("THERAPY_SUGGESTION_COMPUTED", {
-        "user_id": data.user_id,
-        "session_id": data.session_id,
-        "therapy_id": therapy_id,
-        "therapy_name": therapy_name,
-    })
 
     prompt = f"""
 You are a warm, friendly therapy assistant. 
@@ -107,15 +95,27 @@ User message: "{data.user_query}"
 
     is_therapy_suggested = any(p in reply_text for p in suggestion_phrases)
 
+    if is_therapy_suggested:
+        send_monitor_event(
+            "THERAPY_SUGGESTED",
+            {
+                "input": {"user_query": data.user_query},
+                "output": {
+                    "therapy_id": therapy_id,
+                    "therapy_name": therapy_name,
+                    "therapy_path": therapy_path
+                }
+            },
+            data.user_id,
+            data.session_id
+        )
+
     action_pattern = r"action\s*:\s*start[_\- ]therapy\s*:\s*([A-Za-z0-9]+)"
     match = re.search(action_pattern, reply_text, re.IGNORECASE)
+
     action_detected = match.group(1).strip() if match else None
 
-    # ===============================
-    # ACTION DETECTED → start therapy
-    # ===============================
     if action_detected:
-
         save_therapy_history(
             db,
             data.user_id,
@@ -124,27 +124,20 @@ User message: "{data.user_query}"
             therapy_id,
         )
 
-        # ======= MONITOR: Therapy started ============
-        await log_to_monitor("THERAPY_STARTED", {
-            "user_id": data.user_id,
-            "session_id": data.session_id,
-            "therapy_id": therapy_id,
-            "therapy_name": therapy_name,
-        })
-
-        is_therapy_suggested = False
+        send_monitor_event(
+            "THERAPY_STARTED",
+            {
+                "input": {"user_query": data.user_query},
+                "output": {
+                    "therapy_id": therapy_id,
+                    "therapy_name": therapy_name
+                }
+            },
+            data.user_id,
+            data.session_id
+        )
 
     client.close()
-
-    # ======= MONITOR: Response sent ============
-    await log_to_monitor("THERAPY_AGENT_RESPONSE", {
-        "user_id": data.user_id,
-        "session_id": data.session_id,
-        "response": response.content,
-        "action": "START_THERAPY" if action_detected else None,
-        "therapy_id": therapy_id if action_detected else None,
-    })
-
     return {
         "response": response.content.replace("ACTION:START_THERAPY", "").strip(),
         "action": "START_THERAPY" if action_detected else None,
