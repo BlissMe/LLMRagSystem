@@ -8,8 +8,6 @@ from utils.phq9_questions import PHQ9_QUESTIONS
 from utils.tts import generate_tts_audio 
 import key_param
 from fastapi.responses import FileResponse
-from datetime import datetime
-import requests
 
 router = APIRouter()
 
@@ -63,8 +61,6 @@ class QueryRequest(BaseModel):
     history: str
     summaries: list[str] = []
     asked_phq_ids: list[int] = []
-    user_id: int
-    session_id: int
 
 @router.post("/ask")
 async def ask_question(data: QueryRequest):
@@ -95,15 +91,18 @@ async def ask_question(data: QueryRequest):
     early_stage = len(user_turns) < 3
     
     phq_instruction = ""
-    if next_phq_q and not early_stage:
+    if phq_mode:
         if not data.asked_phq_ids:
-            phq_instruction += f"""
-You may now gently say something like:
-"To better understand how you're doing, I'd like to ask a few short questions on how you feel in past two weeks."
-
-Then ask this question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
+            # Before first PHQ question
+            phq_instruction = (
+                "You MUST now gently say something like:\n"
+                '"To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."\n'
+                "Then ask this first question EXACTLY as shown (do NOT paraphrase):\n"
+                f'- "{next_q["meaning"]}"\n\n'
+                "After the user replies, respond with ONE SHORT caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”/ “I’m here for you.”) and move to the next PHQ-9 question in order EXACTLY as shown .\n"
+                "Ask only one PHQ question per message.\n"
+                "User can reply with: not at all, several days, more than half the days, nearly every day."
+            )
         else:
             phq_instruction += f"""
 Continue with the next question:
@@ -121,30 +120,14 @@ Let user respond with:
 
     chat_prompt = f"""
 You are a friendly chatbot who talks like a kind friend.
-
-Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
-
-Your job is to gently explore how the user feels and try to understand user by asking questions, and ask PHQ-9 questions naturally when ready.
-
-NEVER mention PHQ-9 or say "I cannot help you".
-
-Avoid medical or crisis terms unless directly asked.
-
-Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
-
-Past summaries:
-{summary_text}
-
-Relevant context:
+- Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
+- Your job is to gently explore how the user feels and try to understand user by asking questions.
 {context_texts}
-
 Conversation history:
 {history}
-
+{phq_mode}
 {phq_instruction}
-
 User just said: "{query}"
-
 Now reply like a kind friend:
 """
 
@@ -155,66 +138,26 @@ Now reply like a kind friend:
     )
 
     chat_response = bot.invoke([
-        {"role": "system", "content": chat_prompt}
+        {"role": "system", "content": chat_prompt }
     ])
     final_text = chat_response.content.strip()
     client.close()
 
-    matched_q = next_phq_q if not early_stage else None
+    matched_q = next_q if phq_mode else None
+    if not unasked:  # all 9 done
+        matched_q = None
+        phq_mode = False
+
 
 
     audio_path = generate_tts_audio(final_text)
 
-    # ----------------------
-    # PHQ-9 Progress
-    # ----------------------
-    total_phq9 = len(PHQ9_QUESTIONS)
-    answered_phq9 = len(data.asked_phq_ids)
-    phq9_progress = round((answered_phq9 / total_phq9) * 100, 2)
-    phq9_started = bool(data.asked_phq_ids)
-    phq9_completed = not unasked_questions
-
-    # ----------------------
-    # Send activity log to Monitor Agent
-    # ----------------------
-    try:
-        monitor_payload = {
-            "agent_name": "chat",
-            "user_id": data.user_id,
-            "session_id": data.session_id,
-            "input_data": {
-                "user_query": query,
-                "history": history,
-                "summaries": data.summaries,
-                "asked_phq_ids": data.asked_phq_ids
-            },
-            "output_data": {
-                "response": final_text,
-                "phq9_questionID": matched_q["id"] if matched_q else None,
-                "phq9_question": matched_q["question"] if matched_q else None,
-                "phq9_started": phq9_started,
-                "phq9_completed": phq9_completed,
-                "phq9_progress": phq9_progress
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-        response = requests.post(
-            "http://localhost:8000/monitor-agent/track-activity",
-            json=monitor_payload,
-            timeout=15
-        )
-        print("✅ Logged chat activity to Monitor Agent:", response)
-    except Exception as e:
-        print("⚠️ Failed to send log to Monitor Agent:", e)
-
     return {
         "response": final_text,
-        "audio_url": f"/voice-audio?path={audio_path}",
+        "audio_url": f"/voice-audio?path={audio_path}",  
         "phq9_questionID": matched_q["id"] if matched_q else None,
         "phq9_question": matched_q["question"] if matched_q else None,
-        "phq9_progress": phq9_progress,
-        "language": "English"
+        "lanuage": "English"
     }
     
 @router.get("/voice-audio")
