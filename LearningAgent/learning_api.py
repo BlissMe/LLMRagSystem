@@ -1,18 +1,19 @@
+# learning_api.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from datetime import datetime
 from .db_handler import save_report, get_reports_by_user, get_user_summary
 
-router = APIRouter(
-    prefix="/monitor",
-    tags=["Monitoring Agent"]
-)
+router = APIRouter(prefix="/monitor", tags=["Monitoring Agent"])
 
 class Report(BaseModel):
-    agent_name: str
+    agent_name: Literal["assessment", "classifier", "therapy", "monitor"]
     user_id: str
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    data: dict
+    session_id: Optional[str] = None
+    timestamp: str = Field(..., description="ISO-8601 with Z")
+    version: int = Field(1, ge=1)
+    data: dict  # deliberately loose; we keep shape in code that writes it
 
 @router.post("/report")
 async def receive_report(report: Report):
@@ -33,7 +34,7 @@ async def get_user_aggregate(user_id: str):
         raise HTTPException(status_code=404, detail="No summary data available.")
     return {
         "user_id": user_id,
-        "average_depression_confidence": round(summary.get("avg_confidence", 0), 2),
+        "average_depression_confidence": round(summary.get("avg_confidence", 0) or 0, 2),
         "last_therapy": summary.get("last_therapy"),
         "last_assessment": summary.get("last_assessment"),
         "total_reports": summary.get("total_reports", 0)
