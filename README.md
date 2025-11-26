@@ -14,3 +14,6 @@
 
 ### .\venv\Scripts\Activate
 
+
+###### https://chatgpt.com/c/6910963c-8b30-8324-b17b-a539036ff93b
+
