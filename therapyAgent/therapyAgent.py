@@ -146,7 +146,6 @@ User message: "{data.user_query}"
         "therapySuggestion": {"id": therapy_id, "name": therapy_name, "path": therapy_path} if is_therapy_suggested else None,
     }
 
-# ----------------- FEEDBACK ENDPOINT -----------------
 @router.post("/feedback")
 async def save_therapy_feedback(data: TherapyFeedback):
     client = MongoClient(key_param.MONGO_URI)
