@@ -12,12 +12,75 @@ from .utils.history_tracker import save_therapy_history, get_user_therapy_histor
 
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
 
+class TherapyRequest(BaseModel):
+    user_query: str
+    depression_level: str
+    user_id: int
+    session_id: int
+    session_summaries: list[str] = []
+
 class TherapyFeedback(BaseModel):
     user_id: int
     session_id: int | None = None
     therapy_id: str
     duration: float  | None = None
     feedback: str | None = None
+
+
+def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: int):
+    payload = {
+        "agent_name": "therapy",
+        "user_id": user_id,
+        "session_id": session_id,
+        "input_data": {"event": event_name, **data.get("input", {})},
+        "output_data": data.get("output", {}),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    try:
+        requests.post(MONITOR_URL, json=payload, timeout=10)
+        print(f"Logged Therapy Event → {event_name}")
+    except Exception as e:
+        print("Monitor Agent Logging Failed:", e)
+
+def send_therapy_progress_event(user_id: int, session_id: int, therapy_id: str, progress: float):
+    send_monitor_event(
+        "THERAPY_IN_PROGRESS",
+        {"input": {}, "output": {"therapy_id": therapy_id, "progress": progress}},
+        user_id,
+        session_id
+    )
+
+def send_end_therapy_event(user_id: int, session_id: int, therapy_id: str, feedback: str, duration: float | None):
+    # Send final 100% progress
+    send_therapy_progress_event(user_id, session_id, therapy_id, progress=1.0)
+    send_monitor_event(
+        "THERAPY_ENDED",
+        {"input": {}, "output": {"therapy_id": therapy_id, "feedback": feedback, "duration": duration}},
+        user_id,
+        session_id
+    )
+
+@router.post("/feedback")
+async def save_therapy_feedback(data: TherapyFeedback):
+    client = MongoClient(key_param.MONGO_URI)
+    db = client["blissMe"]
+    history_collection = db["TherapyHistory"]
+
+    history_collection.update_one(
+        {"user_id": data.user_id, "session_id": data.session_id, "therapy_id": data.therapy_id},
+        {
+            "$set": {"duration": data.duration, "feedback": data.feedback, "feedback_time": datetime.utcnow()},
+            "$setOnInsert": {"user_id": data.user_id, "session_id": data.session_id, "therapy_id": data.therapy_id},
+        },
+        upsert=True
+    )
+
+    # Mark session as ended with final progress
+    send_end_therapy_event(data.user_id, data.session_id, data.therapy_id, data.feedback, data.duration)
+
+    client.close()
+    return {"success": True, "message": "Therapy feedback saved and session ended"}
+
 
 @router.post("/feedback")
 async def save_therapy_feedback(data: TherapyFeedback):
@@ -52,14 +115,6 @@ async def save_therapy_feedback(data: TherapyFeedback):
     client.close()
 
     return {"success": True, "message": "Therapy feedback saved"}
-
-class TherapyRequest(BaseModel):
-    user_query: str
-    depression_level: str
-    user_id: str
-    session_id: str
-    session_summaries: list[str] = []
-
 
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
@@ -151,6 +206,14 @@ User message: "{data.user_query}"
             feedback=None
         )
         is_therapy_suggested = False  # because user already started
+        send_monitor_event(
+            "THERAPY_STARTED",
+            {"input": {"user_query": data.user_query}, "output": {"therapy_id": therapy_id, "therapy_name": therapy_name}},
+            data.user_id,
+            data.session_id
+        )
+        send_therapy_progress_event(data.user_id, data.session_id, therapy_id, progress=0.0)
+
 
 
     client.close()
