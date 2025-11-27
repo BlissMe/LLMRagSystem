@@ -13,48 +13,6 @@ from .utils.history_tracker import save_therapy_history, get_user_therapy_histor
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
 
 MONITOR_URL = "http://localhost:8000/monitor-agent/track-activity"
-
-class TherapyFeedback(BaseModel):
-    user_id: int
-    session_id: int | None = None
-    therapy_id: str
-    duration: float  | None = None
-    feedback: str | None = None
-
-@router.post("/feedback")
-async def save_therapy_feedback(data: TherapyFeedback):
-
-    client = MongoClient(key_param.MONGO_URI)
-    db = client["blissMe"]
-
-    history_collection = db["TherapyHistory"]
-
-    # Update the latest therapy session
-    history_collection.update_one(
-        {
-            "user_id": data.user_id,
-            "session_id": data.session_id,
-            "therapy_id": data.therapy_id
-        },
-        {
-            "$set": {
-                "duration": data.duration,
-                "feedback": data.feedback,
-                "feedback_time": datetime.utcnow()
-            },
-            "$setOnInsert": {
-                "user_id": data.user_id,
-                "session_id": data.session_id,
-                "therapy_id": data.therapy_id
-            }
-        },
-        upsert=True
-    )
-
-    client.close()
-
-    return {"success": True, "message": "Therapy feedback saved"}
-
 class TherapyRequest(BaseModel):
     user_query: str
     depression_level: str
@@ -76,6 +34,54 @@ def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: in
         print(f"Logged Therapy Event → {event_name}")
     except Exception as e:
         print("Monitor Agent Logging Failed:", e)
+
+class TherapyFeedback(BaseModel):
+    user_id: int
+    session_id: int | None = None
+    therapy_id: str
+    duration: float  | None = None
+    feedback: str | None = None
+
+@router.post("/feedback")
+async def save_therapy_feedback(data: TherapyFeedback):
+    client = MongoClient(key_param.MONGO_URI)
+    db = client["blissMe"]
+
+    history_collection = db["TherapyHistory"]
+
+    history_collection.update_one(
+        {
+            "user_id": data.user_id,
+            "session_id": data.session_id,
+            "therapy_id": data.therapy_id
+        },
+        {
+            "$set": {
+                "duration": data.duration,
+                "feedback": data.feedback,
+                "feedback_time": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "user_id": data.user_id,
+                "session_id": data.session_id,
+                "therapy_id": data.therapy_id
+            }
+        },
+        upsert=True
+    )
+
+    # ✅ Send end therapy event
+    send_end_therapy_event(
+        user_id=data.user_id,
+        session_id=data.session_id,
+        therapy_id=data.therapy_id,
+        feedback=data.feedback,
+        duration=data.duration
+    )
+
+    client.close()
+    return {"success": True, "message": "Therapy feedback saved and session ended"}
+
 
 
 

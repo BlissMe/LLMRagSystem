@@ -107,13 +107,11 @@ You may now gently say something like:
 Then ask this question:
 - "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
 """
-
         else:
             phq_instruction += f"""
 Continue with the next question:
 - "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
 """
-
         phq_instruction += """
 Make your response short and caring. Don't explain too much. No repetition. Only ask one PHQ-9 question per message.
 Let user respond with:
@@ -158,9 +156,7 @@ Now reply like a kind friend:
         temperature=0.7
     )
 
-    chat_response = bot.invoke([
-        {"role": "system", "content": chat_prompt}
-    ])
+    chat_response = bot.invoke([{"role": "system", "content": chat_prompt}])
     final_text = chat_response.content.strip()
     client.close()
 
@@ -178,7 +174,7 @@ Now reply like a kind friend:
     phq9_completed = not unasked_questions
 
     # ----------------------
-    # Send activity log to Monitor Agent
+    # Send activity log to Monitor Agent (chat)
     # ----------------------
     try:
         monitor_payload = {
@@ -211,6 +207,35 @@ Now reply like a kind friend:
     except Exception as e:
         print("Failed to send log to Monitor Agent:", e)
 
+    # ----------------------
+    # Send follow-up chat event after PHQ-9 completion
+    # ----------------------
+    if phq9_completed:
+        try:
+            followup_payload = {
+                "agent_name": "chat",
+                "user_id": data.user_id,
+                "session_id": data.session_id,
+                "event": "FOLLOWUP_CHAT",
+                "input_data": {
+                    "history": history,
+                    "user_query": query
+                },
+                "output_data": {
+                    "response": final_text
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+            followup_resp = requests.post(
+                "http://localhost:8000/monitor-agent/track-activity",
+                json=followup_payload,
+                timeout=15
+            )
+            print("Logged follow-up chat activity to Monitor Agent:", followup_resp)
+        except Exception as e:
+            print("Failed to send follow-up chat log to Monitor Agent:", e)
+
     return {
         "response": final_text,
         "audio_url": f"/voice-audio?path={audio_path}",
@@ -219,7 +244,6 @@ Now reply like a kind friend:
         "phq9_progress": phq9_progress,
         "language": "English"
     }
-
 
 @router.get("/voice-audio") 
 def voice_audio(path: str):
