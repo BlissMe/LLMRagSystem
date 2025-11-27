@@ -173,9 +173,6 @@ Now reply like a kind friend:
     phq9_started = bool(data.asked_phq_ids)
     phq9_completed = not unasked_questions
 
-    # ----------------------
-    # Send activity log to Monitor Agent (chat)
-    # ----------------------
     try:
         monitor_payload = {
             "agent_name": "chat",

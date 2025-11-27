@@ -45,6 +45,31 @@ async def detect(req: DetectionRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+     # ---------------------------
+    # 2️⃣ Log session end
+    # ---------------------------
+    try:
+        session_end_event = {
+            "agent_name": "classifier",
+            "user_id": req.user_id,
+            "session_id": req.session_id,
+            "input_data": {},
+            "output_data": {
+                "event": "session_end"
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        requests.post(
+            "http://localhost:8000/monitor-agent/track-activity",
+            json=session_end_event,
+            timeout=10
+        )
+        print("📌 Logged session end event")
+    except Exception as e:
+        print("⚠️ Failed to log session end:", e)
+
 
     # ---------------------------
     # 1️⃣ Log depression detection
@@ -78,30 +103,7 @@ async def detect(req: DetectionRequest):
     except Exception as e:
         print("⚠️ Failed to log depression detection:", e)
 
-    # ---------------------------
-    # 2️⃣ Log session end
-    # ---------------------------
-    try:
-        session_end_event = {
-            "agent_name": "classifier",
-            "user_id": req.user_id,
-            "session_id": req.session_id,
-            "input_data": {},
-            "output_data": {
-                "event": "session_end"
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-        requests.post(
-            "http://localhost:8000/monitor-agent/track-activity",
-            json=session_end_event,
-            timeout=10
-        )
-        print("📌 Logged session end event")
-    except Exception as e:
-        print("⚠️ Failed to log session end:", e)
-
+   
     # ---------------------------
     # Return detection response
     # ---------------------------
