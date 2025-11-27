@@ -207,9 +207,9 @@ Now reply like a kind friend:
             json=monitor_payload,
             timeout=15
         )
-        print("✅ Logged chat activity to Monitor Agent:", response)
+        print("Logged chat activity to Monitor Agent:", response)
     except Exception as e:
-        print("⚠️ Failed to send log to Monitor Agent:", e)
+        print("Failed to send log to Monitor Agent:", e)
 
     return {
         "response": final_text,

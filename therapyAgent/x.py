@@ -192,4 +192,4 @@ User message: "{data.user_query}"
             "name": therapy_name,
             "path": therapy_path,
         } if is_therapy_suggested else None,
-    } 
+    }
