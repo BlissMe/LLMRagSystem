@@ -11,7 +11,12 @@ from .utils.therapy_selector import get_therapy_recommendation
 from .utils.history_tracker import save_therapy_history, get_user_therapy_history
 
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
+MONITOR_URL = "http://localhost:8000/monitor-agent/track-activity"
 
+
+# =======================
+# MODELS
+# =======================
 class TherapyRequest(BaseModel):
     user_query: str
     depression_level: str
@@ -19,14 +24,18 @@ class TherapyRequest(BaseModel):
     session_id: int
     session_summaries: list[str] = []
 
+
 class TherapyFeedback(BaseModel):
     user_id: int
     session_id: int | None = None
     therapy_id: str
-    duration: float  | None = None
+    duration: float | None = None
     feedback: str | None = None
 
 
+# =======================
+# MONITOR HELPERS
+# =======================
 def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: int):
     payload = {
         "agent_name": "therapy",
@@ -42,61 +51,56 @@ def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: in
     except Exception as e:
         print("Monitor Agent Logging Failed:", e)
 
-def send_therapy_progress_event(user_id: int, session_id: int, therapy_id: str, progress: float):
+
+def send_therapy_progress_event(user_id: int, session_id: int, therapy_id: str, therapy_name: str, progress: float):
     send_monitor_event(
         "THERAPY_IN_PROGRESS",
-        {"input": {}, "output": {"therapy_id": therapy_id, "progress": progress}},
+        {"input": {}, "output": {"therapy_id": therapy_id, "therapy_name": therapy_name, "progress": progress}},
         user_id,
         session_id
     )
 
-def send_end_therapy_event(user_id: int, session_id: int, therapy_id: str, feedback: str, duration: float | None):
-    # Send final 100% progress
-    send_therapy_progress_event(user_id, session_id, therapy_id, progress=1.0)
+
+def send_end_therapy_event(user_id: int, session_id: int, therapy_id: str, therapy_name: str, feedback: str, duration: float | None):
+    # mark progress 100%
+    send_therapy_progress_event(user_id, session_id, therapy_id, therapy_name, progress=1.0)
+
     send_monitor_event(
         "THERAPY_ENDED",
-        {"input": {}, "output": {"therapy_id": therapy_id, "feedback": feedback, "duration": duration}},
+        {
+            "input": {},
+            "output": {
+                "therapy_id": therapy_id,
+                "therapy_name": therapy_name,
+                "feedback": feedback,
+                "duration": duration
+            }
+        },
         user_id,
         session_id
     )
 
+
+# =======================
+# FEEDBACK ENDPOINT
+# =======================
 @router.post("/feedback")
 async def save_therapy_feedback(data: TherapyFeedback):
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
     history_collection = db["TherapyHistory"]
 
+    history_record = history_collection.find_one({
+        "user_id": data.user_id,
+        "session_id": data.session_id,
+        "therapy_id": data.therapy_id
+    })
+
+    therapy_name = history_record.get("therapy_name", "Unknown Therapy") if history_record else "Unknown Therapy"
+
+    # Save feedback
     history_collection.update_one(
         {"user_id": data.user_id, "session_id": data.session_id, "therapy_id": data.therapy_id},
-        {
-            "$set": {"duration": data.duration, "feedback": data.feedback, "feedback_time": datetime.utcnow()},
-            "$setOnInsert": {"user_id": data.user_id, "session_id": data.session_id, "therapy_id": data.therapy_id},
-        },
-        upsert=True
-    )
-
-    # Mark session as ended with final progress
-    send_end_therapy_event(data.user_id, data.session_id, data.therapy_id, data.feedback, data.duration)
-
-    client.close()
-    return {"success": True, "message": "Therapy feedback saved and session ended"}
-
-
-@router.post("/feedback")
-async def save_therapy_feedback(data: TherapyFeedback):
-
-    client = MongoClient(key_param.MONGO_URI)
-    db = client["blissMe"]
-
-    history_collection = db["TherapyHistory"]
-
-    # Update the latest therapy session
-    history_collection.update_one(
-        {
-            "user_id": data.user_id,
-            "session_id": data.session_id,
-            "therapy_id": data.therapy_id
-        },
         {
             "$set": {
                 "duration": data.duration,
@@ -106,56 +110,64 @@ async def save_therapy_feedback(data: TherapyFeedback):
             "$setOnInsert": {
                 "user_id": data.user_id,
                 "session_id": data.session_id,
-                "therapy_id": data.therapy_id
+                "therapy_id": data.therapy_id,
+                "therapy_name": therapy_name
             }
         },
         upsert=True
     )
 
+    # log event
+    send_end_therapy_event(
+        data.user_id,
+        data.session_id,
+        data.therapy_id,
+        therapy_name,
+        data.feedback,
+        data.duration
+    )
+
     client.close()
+    return {"success": True, "message": "Therapy feedback saved and session ended"}
 
-    return {"success": True, "message": "Therapy feedback saved"}
 
+# =======================
+# CHAT ENDPOINT
+# =======================
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
 
-    # Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
     recent_history = "\n".join(
         [
-            f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)"
+            f"{h.get('therapy_name', 'Unknown Therapy')} on {h.get('date', 'Unknown Date')} "
+            f"(duration {h.get('duration', 'N/A')} mins)"
             for h in history_records
         ]
     ) if history_records else "No prior therapies found."
 
-    # Get new suggestion
-    therapy_suggestion = get_therapy_recommendation(
-        db, data.depression_level, history_records
-    )
-
+    # therapy suggestion
+    therapy_suggestion = get_therapy_recommendation(db, data.depression_level, history_records)
     therapy_name = therapy_suggestion.get("name")
     therapy_id = therapy_suggestion.get("id")
     therapy_path = therapy_suggestion.get("path", None)
     therapy_description = therapy_suggestion.get("description", "")
 
     # =======================
-    #       BASE PROMPT
+    # LLM prompt
     # =======================
     prompt = f"""
-You are a warm, friendly therapy assistant. 
-Your main job is to support the user emotionally AND suggest a therapy when appropriate.
+You are a warm, friendly therapy assistant.
 
 Rules:
-- Keep responses short, caring, simple.
+- Keep responses short and caring.
 - Never mention depression level.
-- Suggest therapies gently when appropriate.
-- If suggesting a therapy, ask:
-  "Would you like to start the {therapy_name} therapy now?"
-
-If the user agrees, you MUST respond with EXACT format:
+- Suggest a therapy gently when appropriate.
+- If suggesting, ask: "Would you like to start the {therapy_name} therapy now?"
+If the user agrees you MUST respond:
 ACTION:START_THERAPY:{therapy_id}
 
 User history:
@@ -167,34 +179,35 @@ User message: "{data.user_query}"
     bot = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
     response = bot.invoke([{"role": "user", "content": prompt}])
 
-    reply_text = response.content.strip().lower()
+    original_reply = response.content.strip()
+    reply_lower = original_reply.lower()
 
-    # ===============================================================
-    # 1. Detect if model SUGGESTED the therapy (frontend uses this)
-    # ===============================================================
+    # detect suggestion
     suggestion_phrases = [
-        f"start the {therapy_name.lower()} therapy",
-        f"try the {therapy_name.lower()} therapy",
-        f"{therapy_name.lower()} therapy now",
+        "start the",
+        "would you like to start",
+        "try the",
+        "therapy now",
+        therapy_name.lower()
     ]
+    is_therapy_suggested = any(p in reply_lower for p in suggestion_phrases)
 
-    is_therapy_suggested = any(p in reply_text for p in suggestion_phrases)
+    if is_therapy_suggested:
+        send_monitor_event(
+            "THERAPY_SUGGESTED",
+            {
+                "input": {"user_query": data.user_query},
+                "output": {"therapy_id": therapy_id, "therapy_name": therapy_name}
+            },
+            data.user_id,
+            data.session_id
+        )
 
-    # ===============================================================
-    # 2. Detect ACTION:START_THERAPY in ALL POSSIBLE MODEL VARIATIONS
-    # ===============================================================
-    # regex covers:
-    # ACTION:START_THERAPY:ID
-    # action: start_therapy : id
-    # Action:Start-Therapy:id
-    # ---------------------------------------------------------------
-    action_pattern = r"action\s*:\s*start[_\- ]therapy\s*:\s*([A-Za-z0-9]+)"
-
-    match = re.search(action_pattern, reply_text, re.IGNORECASE)
-
+    # detect ACTION
+    action_pattern = r"action\s*[:\- ]+\s*start[_\- ]?therapy\s*[:\- ]+\s*([A-Za-z0-9]+)"
+    match = re.search(action_pattern, reply_lower)
     action_detected = match.group(1).strip() if match else None
 
-    # If ACTION detected → save history
     if action_detected:
         save_therapy_history(
             db,
@@ -205,33 +218,91 @@ User message: "{data.user_query}"
             duration=None,
             feedback=None
         )
-        is_therapy_suggested = False  # because user already started
-        send_monitor_event(
-            "THERAPY_STARTED",
-            {"input": {"user_query": data.user_query}, "output": {"therapy_id": therapy_id, "therapy_name": therapy_name}},
+
+        send_therapy_progress_event(
             data.user_id,
-            data.session_id
+            data.session_id,
+            therapy_id,
+            therapy_name,
+            progress=0.0
         )
-        send_therapy_progress_event(data.user_id, data.session_id, therapy_id, progress=0.0)
 
-
+        is_therapy_suggested = False
 
     client.close()
 
-    # ===============================================
-    # FINAL RESPONSE TO FRONTEND (Fully Consistent)
-    # ===============================================
+    clean_reply = original_reply.replace("ACTION:START_THERAPY", "").strip()
+
     return {
-        "response": response.content.replace("ACTION:START_THERAPY", "").strip(),
+        "response": clean_reply,
         "action": "START_THERAPY" if action_detected else None,
         "therapy_id": therapy_id if (action_detected or is_therapy_suggested) else None,
         "therapy_name": therapy_name if (action_detected or is_therapy_suggested) else None,
-        "therapy_description": therapy_description if (action_detected or is_therapy_suggested) else None,
+        "therapy_description": therapy_description,
         "therapy_path": therapy_path,
         "isTherapySuggested": is_therapy_suggested,
         "therapySuggestion": {
             "id": therapy_id,
             "name": therapy_name,
-            "path": therapy_path,
+            "path": therapy_path
         } if is_therapy_suggested else None,
+    }
+
+
+# =======================
+# MANUAL START ENDPOINT
+# =======================
+class ManualStartRequest(BaseModel):
+    user_id: int
+    session_id: int
+    therapy_id: str
+    therapy_name: str
+
+
+@router.post("/end-start")
+async def manual_start_therapy(data: ManualStartRequest):
+    client = MongoClient(key_param.MONGO_URI)
+    db = client["blissMe"]
+
+    # save history
+    save_therapy_history(
+        db,
+        data.user_id,
+        data.session_id,
+        data.therapy_name,
+        data.therapy_id,
+        duration=None,
+        feedback=None
+    )
+
+    # log start
+    send_monitor_event(
+        "THERAPY_STARTED",
+        {
+            "input": {},
+            "output": {
+                "therapy_id": data.therapy_id,
+                "therapy_name": data.therapy_name
+            }
+        },
+        data.user_id,
+        data.session_id
+    )
+
+    # progress 0%
+    send_therapy_progress_event(
+        data.user_id,
+        data.session_id,
+        data.therapy_id,
+        data.therapy_name,
+        progress=0.0
+    )
+
+    client.close()
+
+    return {
+        "success": True,
+        "message": "Therapy session started",
+        "therapy_id": data.therapy_id,
+        "therapy_name": data.therapy_name
     }
