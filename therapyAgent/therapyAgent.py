@@ -249,9 +249,6 @@ User message: "{data.user_query}"
     }
 
 
-# =======================
-# MANUAL START ENDPOINT
-# =======================
 class ManualStartRequest(BaseModel):
     user_id: int
     session_id: int
