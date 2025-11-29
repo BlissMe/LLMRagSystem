@@ -58,6 +58,7 @@ class TherapyRequest(BaseModel):
     user_id: str
     session_id: str
     session_summaries: list[str] = []
+    therapy_feedback_conclusion: str | None = None
 
 
 @router.post("/chat")
@@ -84,6 +85,11 @@ async def therapy_chat(data: TherapyRequest):
     therapy_id = therapy_suggestion.get("id")
     therapy_path = therapy_suggestion.get("path", None)
     therapy_description = therapy_suggestion.get("description", "")
+    feedback_summary = (
+    f"\n\nTherapy feedback analysis:\n{data.therapy_feedback_conclusion}\n"
+    if data.therapy_feedback_conclusion
+    else ""
+)
 
     # =======================
     #       BASE PROMPT
@@ -91,6 +97,12 @@ async def therapy_chat(data: TherapyRequest):
     prompt = f"""
 You are a warm, friendly therapy assistant. 
 Your main job is to support the user emotionally AND suggest a therapy when appropriate.
+
+The user has previous therapy feedback and usage history. 
+You can consider this feedback when recommending therapies.
+
+Therapy outcome summary (very important):
+{data.therapy_feedback_conclusion or "No feedback summary available."}
 
 Rules:
 - Keep responses short, caring, simple.

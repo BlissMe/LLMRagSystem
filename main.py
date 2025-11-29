@@ -13,7 +13,8 @@ from voiceChatMode.voice import router as voice_router
 from LevelDetection.router.levelDetection import router as level_detection_router
 #from textChatMode.assesmentAgent.routes import router as agent_router
 from CountingGame.game import router as game_router
-from MonitoringAgent.monitor_api import router as monitor_router
+#from MonitoringAgent.monitor_api import router as monitor_router
+from LearningAgent.Feedback_Therapy.app_fastapi import router as therapyFeedback_router
 
 from therapyAgent.therapyAgent import router as therapy_router
 
@@ -36,9 +37,10 @@ app.include_router(level_detection_router)
 #app.include_router(agent_router)
 app.include_router(game_router)
 
-app.include_router(monitor_router)
+#app.include_router(monitor_router)
 
 app.include_router(therapy_router)
+app.include_router(therapyFeedback_router)
 
 @app.get("/")
 def root():
