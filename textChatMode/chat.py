@@ -219,7 +219,8 @@ Now reply like a kind friend:
                     "user_query": query
                 },
                 "output_data": {
-                    "response": final_text
+                    "response": final_text,
+                    "event": "FOLLOWUP_CHAT"
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }
