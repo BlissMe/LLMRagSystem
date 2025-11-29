@@ -1,7 +1,7 @@
 # pipeline.py
-from db_utils import get_therapy_history_by_user
-from analyze_utils import aggregate_by_therapy, normalize_scores
-from llm_utils import score_feedback_with_llm
+from .db_utils import get_therapy_history_by_user
+from .analyze_utils import aggregate_by_therapy, normalize_scores
+from .llm_utils import score_feedback_with_llm
 
 def compute_therapy_report_for_user(user_id: int):
     docs = get_therapy_history_by_user(user_id)

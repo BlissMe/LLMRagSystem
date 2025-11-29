@@ -14,7 +14,7 @@ default_therapies = [
         "name": "Mindful Breathing",
         "applicableLevel": "Moderate",
         "description": "A breathing control game designed to synchronize breathing patterns with calming visuals.",
-        "path": "/therapy/breathing",
+        "path": "therapy/breathing",
         "durationMinutes": 10,
     },
     {
@@ -30,7 +30,7 @@ default_therapies = [
         "name": "Mindful Forest",
         "applicableLevel": "Moderate",
         "description": "Nature-themed mindfulness therapy to immerse the user in calming virtual forest experiences.",
-        "path": "/dash/forest",
+        "path": "/therapy/forest",
         "durationMinutes": 12,
     },
     {
@@ -62,7 +62,7 @@ default_therapies = [
         "name": "Number Guessing Game",
         "applicableLevel": "Minimal",
         "description": "A fun and engaging number guessing game to distract and entertain users.",
-        "path": "/game/therapy_game",
+        "path": "/therapy/number-guessing-game",
         "durationMinutes": 10,
     },
     {
@@ -70,7 +70,7 @@ default_therapies = [
         "name": "ocean-waves",
         "applicableLevel": "Moderate",
         "description": "Audio-visual therapy simulating ocean waves for deep relaxation and mindfulness.",
-        "path": "/dash/ocean",
+        "path": "/therapy/ocean",
         "durationMinutes": 10,
     },
     {
@@ -78,7 +78,7 @@ default_therapies = [
         "name": "Zen Garden",
         "applicableLevel": "Moderate",
         "description": "A virtual Zen garden experience for reflection, focus, and cognitive grounding.",
-        "path": "/dash/zen",
+        "path": "/therapy/zen",
         "durationMinutes": 5,
     },
      {
