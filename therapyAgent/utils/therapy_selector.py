@@ -6,7 +6,7 @@ default_therapies = [
         "name": "Listen Me",
         "applicableLevel": "Moderate",
         "description": "Provide Relaxing musics to calm the mind.",
-        "path": "/dash/anxiety",
+        "path": "/therapy/all-songs",
         "durationMinutes": 6,
     },
     {
