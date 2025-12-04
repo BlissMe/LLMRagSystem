@@ -19,7 +19,7 @@ result = agent.ingest_interaction(
         "labels": {"classifier": "Depression Signs Detected", "confidence": 85}
     }
 )
-print("✅ Ingestion Result:", result.dict())
+print("Ingestion Result:", result.dict())
 
 # ---------- STEP 2: Verify anonymization ----------
 from pymongo import MongoClient
