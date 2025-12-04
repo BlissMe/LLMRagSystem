@@ -35,11 +35,11 @@ feedback = agent.apply_feedback(
     corrected_label="No Depression Signs Detected",
     note="Classifier overestimated sadness"
 )
-print("\n✅ Feedback Result:", feedback)
+print("\n Feedback Result:", feedback)
 
 # ---------- STEP 4: Export fine-tune JSONL ----------
 path = agent.export_finetune_jsonl("tmp/ft_export.jsonl", limit=5)
-print("\n✅ Fine-tune data exported to:", path)
+print("\n Fine-tune data exported to:", path)
 
 # ---------- STEP 5: Distribution & summary ----------
 dist = agent.get_label_distribution()
