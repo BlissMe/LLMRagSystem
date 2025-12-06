@@ -4,7 +4,7 @@ from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from datetime import datetime
 import key_param
-import re
+
 
 from .utils.therapy_selector import get_therapy_recommendation
 from .utils.history_tracker import save_therapy_history, get_user_therapy_history
@@ -59,9 +59,12 @@ class TherapyRequest(BaseModel):
     session_id: str
     session_summaries: list[str] = []
 
-
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
+    """
+    Therapy Agent main route:
+    Handles chat, suggests therapies, tracks user progress.
+    """
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
@@ -69,41 +72,33 @@ async def therapy_chat(data: TherapyRequest):
     # Fetch therapy history
     history_records = get_user_therapy_history(db, data.user_id)
     recent_history = "\n".join(
-        [
-            f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)"
-            for h in history_records
-        ]
+        [f"{h['therapy_name']} on {h['date']} (duration {h['duration']} mins)" for h in history_records]
     ) if history_records else "No prior therapies found."
 
-    # Get new suggestion
-    therapy_suggestion = get_therapy_recommendation(
-        db, data.depression_level, history_records
-    )
+    #  Suggest new therapy
+    therapy_suggestion = get_therapy_recommendation(db, data.depression_level, history_records)
 
-    therapy_name = therapy_suggestion.get("name")
-    therapy_id = therapy_suggestion.get("id")
-    therapy_path = therapy_suggestion.get("path", None)
-    therapy_description = therapy_suggestion.get("description", "")
-
-    # =======================
-    #       BASE PROMPT
-    # =======================
+    # Base prompt
     prompt = f"""
-You are a warm, friendly therapy assistant. 
-Your main job is to support the user emotionally AND suggest a therapy when appropriate.
+You are a friendly therapy assistant designed to support users with {data.depression_level} depression.
+You talk like a warm and caring friend. don't always suggest therapies, suggestwhen appropriate based on the user's emotional state other times KEEP CHATTING as caring friend BUT your main duty is suggesting therapies.
 
-Rules:
-- Keep responses short, caring, simple.
-- Never mention depression level.
-- Suggest therapies gently when appropriate.
-- If suggesting a therapy, ask:
-  "Would you like to start the {therapy_name} therapy now?"
-
-If the user agrees, you MUST respond with EXACT format:
-ACTION:START_THERAPY:{therapy_id}
-
-User history:
+Current user history:
 {recent_history}
+
+If the user has moderate or minimal depression, suggest small helpful activities or therapies from the system.
+Therapies can include relaxation breathing, mindfulness, journaling, or gratitude reflection.
+don't use log sentences. keep it short and simple.
+don't mention about depression level or depression to the user.
+
+
+If a therapy matches one from the system, gently ask:
+"Would you like to start the {therapy_suggestion['name']} therapy now?"
+
+If the user agrees, return:
+ACTION:START_THERAPY:{therapy_suggestion['id']}
+
+Otherwise, continue gentle conversation and emotional support.
 
 User message: "{data.user_query}"
 """
@@ -111,63 +106,35 @@ User message: "{data.user_query}"
     bot = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=key_param.openai_api_key)
     response = bot.invoke([{"role": "user", "content": prompt}])
 
-    reply_text = response.content.strip().lower()
+    reply_text = response.content.strip()
+    action_detected = None
+    is_therapy_suggested = False  
 
-    # ===============================================================
-    # 1. Detect if model SUGGESTED the therapy (frontend uses this)
-    # ===============================================================
-    suggestion_phrases = [
-        f"start the {therapy_name.lower()} therapy",
-        f"try the {therapy_name.lower()} therapy",
-        f"{therapy_name.lower()} therapy now",
-    ]
+    
+    if f"start the {therapy_suggestion['name']} therapy" in reply_text.lower():
+        is_therapy_suggested = True
 
-    is_therapy_suggested = any(p in reply_text for p in suggestion_phrases)
-
-    # ===============================================================
-    # 2. Detect ACTION:START_THERAPY in ALL POSSIBLE MODEL VARIATIONS
-    # ===============================================================
-    # regex covers:
-    # ACTION:START_THERAPY:ID
-    # action: start_therapy : id
-    # Action:Start-Therapy:id
-    # ---------------------------------------------------------------
-    action_pattern = r"action\s*:\s*start[_\- ]therapy\s*:\s*([A-Za-z0-9]+)"
-
-    match = re.search(action_pattern, reply_text, re.IGNORECASE)
-
-    action_detected = match.group(1).strip() if match else None
-
-    # If ACTION detected → save history
-    if action_detected:
+   
+    if "ACTION:START_THERAPY" in reply_text:
+        action_detected = reply_text.split("ACTION:START_THERAPY:")[-1].strip()
         save_therapy_history(
             db,
             data.user_id,
             data.session_id,
-            therapy_name,
-            therapy_id,
-            duration=None,
-            feedback=None
+            therapy_suggestion["name"],
+            therapy_suggestion["id"]
         )
-        is_therapy_suggested = False  # because user already started
+        is_therapy_suggested = False 
 
 
     client.close()
 
-    # ===============================================
-    # FINAL RESPONSE TO FRONTEND (Fully Consistent)
-    # ===============================================
     return {
-        "response": response.content.replace("ACTION:START_THERAPY", "").strip(),
-        "action": "START_THERAPY" if action_detected else None,
-        "therapy_id": therapy_id if (action_detected or is_therapy_suggested) else None,
-        "therapy_name": therapy_name if (action_detected or is_therapy_suggested) else None,
-        "therapy_description": therapy_description if (action_detected or is_therapy_suggested) else None,
-        "therapy_path": therapy_path,
-        "isTherapySuggested": is_therapy_suggested,
-        "therapySuggestion": {
-            "id": therapy_id,
-            "name": therapy_name,
-            "path": therapy_path,
-        } if is_therapy_suggested else None,
-    }
+    "response": reply_text.replace("ACTION:START_THERAPY", "").strip(),
+    "action": "START_THERAPY" if action_detected else None,
+    "therapy_id": action_detected,
+    "therapy_name": therapy_suggestion["name"] if action_detected else None,
+    "therapy_path": therapy_suggestion.get("path"),  
+    "isTherapySuggested": is_therapy_suggested, 
+}
+

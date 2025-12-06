@@ -3,34 +3,34 @@ import random
 default_therapies = [
     {
         "therapyID": "T001",
-        "name": "Listen Me",
+        "name": "Anxiety_Games",
         "applicableLevel": "Moderate",
-        "description": "Provide Relaxing musics to calm the mind.",
+        "description": "A fun game-based therapy to reduce anxiety levels through interactive relaxation challenges.",
         "path": "/dash/anxiety",
-        "durationMinutes": 6,
+        "durationMinutes": 15,
     },
     {
         "therapyID": "T002",
-        "name": "Mindful Breathing",
+        "name": "breathing-game",
         "applicableLevel": "Moderate",
         "description": "A breathing control game designed to synchronize breathing patterns with calming visuals.",
-        "path": "/therapy/breathing",
+        "path": "/dash/anxiety",
         "durationMinutes": 10,
     },
     {
         "therapyID": "T003",
-        "name": "Meditation Session",
+        "name": "BreathingExercise",
         "applicableLevel": "Minimal",
-        "description": "Simple guided to hearing raining or sunny day sound to feeling relaxed.",
-        "path": "/therapy/medication",
+        "description": "Simple guided breathing exercises to ease mild anxiety and enhance focus.",
+        "path": "therapy/breathing",
         "durationMinutes": 8,
     },
     {
         "therapyID": "T004",
-        "name": "Mindful Forest",
+        "name": "forest-game",
         "applicableLevel": "Moderate",
         "description": "Nature-themed mindfulness therapy to immerse the user in calming virtual forest experiences.",
-        "path": "/dash/forest",
+        "path": "/dash/anxiety",
         "durationMinutes": 12,
     },
     {
@@ -43,10 +43,10 @@ default_therapies = [
     },
     {
         "therapyID": "T006",
-        "name": "Body Scan Therapy",
+        "name": "MeditationPlayer",
         "applicableLevel": "Moderate",
-        "description": "Guided body scan meditation to promote relaxation and body awareness.",
-        "path": "/therapy/body-scan",
+        "description": "A meditation player that provides guided sessions for stress management and inner peace.",
+        "path": "therapy/medication",
         "durationMinutes": 15,
     },
     {
@@ -62,7 +62,7 @@ default_therapies = [
         "name": "Number Guessing Game",
         "applicableLevel": "Minimal",
         "description": "A fun and engaging number guessing game to distract and entertain users.",
-        "path": "/game/therapy_game",
+        "path": "game/therapy_game",
         "durationMinutes": 10,
     },
     {
@@ -70,26 +70,19 @@ default_therapies = [
         "name": "ocean-waves",
         "applicableLevel": "Moderate",
         "description": "Audio-visual therapy simulating ocean waves for deep relaxation and mindfulness.",
-        "path": "/dash/ocean",
+        "path": "/dash/anxiety",
         "durationMinutes": 10,
     },
     {
         "therapyID": "T010",
-        "name": "Zen Garden",
-        "applicableLevel": "Moderate",
+        "name": "zen-garden",
+        "applicableLevel": "Severe",
         "description": "A virtual Zen garden experience for reflection, focus, and cognitive grounding.",
-        "path": "/dash/zen",
-        "durationMinutes": 5,
-    },
-     {
-        "therapyID": "T0011",
-        "name": "Anxiety_Games",
-        "applicableLevel": "Moderate",
-        "description": "A fun game-based therapy to reduce anxiety levels through interactive relaxation challenges.",
         "path": "/dash/anxiety",
-        "durationMinutes": 15,
+        "durationMinutes": 20,
     },
 ]
+
 
 def get_therapy_recommendation(db, depression_level, history_records):
     """
