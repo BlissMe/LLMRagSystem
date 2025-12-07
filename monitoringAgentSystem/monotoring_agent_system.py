@@ -8,7 +8,7 @@ from typing import List, Optional
 
 router = APIRouter(prefix="/monitor-agent", tags=["Monitor Agent"])
 
-clientAI = OpenAI(api_key=key_param.OPENAI_API_KEY)
+clientAI = OpenAI(api_key=key_param.openai_api_key)
 
 
 # -------------------------------
