@@ -5,6 +5,7 @@ from pymongo import MongoClient
 from openai import OpenAI
 import key_param
 from typing import List, Optional
+import json
 
 router = APIRouter(prefix="/monitor-agent", tags=["Monitor Agent"])
 
@@ -68,7 +69,7 @@ async def run_monitoring_agent(activity: AgentActivity):
     )
 
     ai_output_text = response.output_text
-    return eval(ai_output_text)  # JSON from AI agent
+    return json.loads(ai_output_text)
 
 
 # -------------------------------
