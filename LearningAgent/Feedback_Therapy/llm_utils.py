@@ -3,8 +3,10 @@ import os
 import json
 from dotenv import load_dotenv
 
+import key_param
+
 load_dotenv()
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or key_param.openai_api_key 
 if not OPENAI_API_KEY:
     raise RuntimeError("Please set OPENAI_API_KEY in your .env or environment")
 
