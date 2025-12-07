@@ -196,7 +196,7 @@ Now reply like a kind friend:
         }
 
         response = requests.post(
-            "http://localhost:8000/monitor-agent/track-activity",
+            f"{key_param.llm_base}/monitor-agent/track-activity",
             json=monitor_payload,
             timeout=15
         )
@@ -226,7 +226,7 @@ Now reply like a kind friend:
             }
 
             followup_resp = requests.post(
-                "http://localhost:8000/monitor-agent/track-activity",
+                f"{key_param.llm_base}/monitor-agent/track-activity",
                 json=followup_payload,
                 timeout=15
             )

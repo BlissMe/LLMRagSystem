@@ -62,7 +62,7 @@ async def detect(req: DetectionRequest):
         }
 
         requests.post(
-            "http://localhost:8000/monitor-agent/track-activity",
+            f"{key_param.llm_base}/monitor-agent/track-activity",
             json=session_end_event,
             timeout=10
         )
@@ -95,7 +95,7 @@ async def detect(req: DetectionRequest):
         }
 
         requests.post(
-            "http://localhost:8000/monitor-agent/track-activity",
+            f"{key_param.llm_base}/monitor-agent/track-activity",
             json=depression_event,
             timeout=10
         )

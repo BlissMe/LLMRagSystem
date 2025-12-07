@@ -11,7 +11,7 @@ from .utils.therapy_selector import get_therapy_recommendation
 from .utils.history_tracker import save_therapy_history, get_user_therapy_history
 
 router = APIRouter(prefix="/therapy-agent", tags=["Therapy Agent"])
-MONITOR_URL = "http://localhost:8000/monitor-agent/track-activity"
+MONITOR_URL = f"{key_param.llm_base}/monitor-agent/track-activity"
 
 
 # =======================
