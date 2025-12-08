@@ -7,7 +7,7 @@ import os
 import key_param
 
 # MongoDB connection
-client = MongoClient(key_param.MONGO_URI)
+client = MongoClient(key_param.MONGO_URI_KB)
 db = client["Depression_Knowledge_Base"]
 collection = db["all_knowledge"]  
 

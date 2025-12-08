@@ -3,6 +3,7 @@ from langchain import OpenAI
 from langchain.agents import Tool, initialize_agent, AgentType
 from pipeline import compute_therapy_report_for_user
 from conclusion_utils import generate_conclusion
+from kb_writer import save_summary_to_kb
 import json
 
 # LLM used to wrap agent (for natural language reasoning)
@@ -20,6 +21,14 @@ def tool_get_report(user_input: str):
     user_id = int(m.group())
     report = compute_therapy_report_for_user(user_id)
     conclusion = generate_conclusion(report)
+    
+    try:
+        if report.get("therapies"):
+            top_therapy = report["therapies"][0]["therapy_id"]
+            save_summary_to_kb(top_therapy, conclusion)
+    except Exception as e:
+        print(f"[KB WARNING] Could not save summary to KB: {e}")
+        
     result = {"report": report, "conclusion": conclusion}
     return json.dumps(result, indent=2)
 
@@ -40,6 +49,8 @@ agent = initialize_agent(
 
 def run_agent_query(query: str):
     return agent.run(query)
+
+
 
 # Example usage when running as script:
 if __name__ == "__main__":
