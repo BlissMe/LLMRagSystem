@@ -27,4 +27,4 @@ jobs:
           git remote add hfa https://ImashaNawodi:$HF_TOKEN@huggingface.co/spaces/ImashaNawodi/learning_Agent
           
           # Force push GitHub's learning_agent → HuggingFace main
-          git push hfa learning_agent:main --force
+          git push hfa Production:main --force
