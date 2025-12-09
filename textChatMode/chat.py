@@ -75,7 +75,7 @@ async def ask_question(data: QueryRequest):
     history = data.history
 
     # MongoDB Setup
-    client = MongoClient(key_param.MONGO_URI)
+    client = MongoClient(key_param.MONGO_URI_KB)
     db = client["Depression_Knowledge_Base"]
     collection = db["depression"]
     index_name = "default1"

@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Query, BackgroundTasks
+from pydantic import BaseModel, Field
 from datetime import datetime
 from pymongo import MongoClient
-from openai import OpenAI
 import key_param
-from typing import List, Optional
+from typing import List
 import json
 
-router = APIRouter(prefix="/monitor-agent", tags=["Monitor Agent"])
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
 
-clientAI = OpenAI(api_key=key_param.openai_api_key)
+router = APIRouter(prefix="/monitor-agent", tags=["Monitor Agent"])
 
 
 # -------------------------------
@@ -22,71 +23,88 @@ class AgentActivity(BaseModel):
     session_id: int
     input_data: dict
     output_data: dict
-    timestamp: datetime = datetime.utcnow()
+    timestamp: datetime = Field(default_factory=datetime.utcnow)  # ✅ fixed timestamp bug
+
 
 class MonitorFeedbackRequest(BaseModel):
-    recent_activities: list[AgentActivity]
+    recent_activities: List[AgentActivity]
 
 
 # -------------------------------
-# AI AGENT FUNCTION
+# AI MONITORING FUNCTION
 # -------------------------------
 
 async def run_monitoring_agent(activity: AgentActivity):
-    """
-    Sends agent activity to an OpenAI monitoring agent that
-    evaluates risk level, identifies anomalies, and summarizes behavior.
-    """
 
-    prompt = f"""
-    You are the BLISS-ME Monitoring AI Agent.
-    Your job is to analyze a single agent activity event.
+    class MonitorResult(BaseModel):
+        summary: str
+        risk_level: str
+        possible_issue: str
+        anomaly_detected: bool
 
-    Provide output in strict JSON:
-    {{
-        "summary": "...",
-        "risk_level": "low | medium | high",
-        "possible_issue": "...",
-        "anomaly_detected": true | false
-    }}
+    parser = JsonOutputParser(pydantic_object=MonitorResult)
 
-    Activity Data:
-    - Agent: {activity.agent_name}
-    - User ID: {activity.user_id}
-    - Session ID: {activity.session_id}
+    prompt = ChatPromptTemplate.from_template("""
+You are the BLISS-ME Monitoring AI Agent.
+Analyze the following agent activity and produce STRICT JSON ONLY.
 
-    Input:
-    {activity.input_data}
+AGENT NAME: {agent_name}
+USER ID: {user_id}
+SESSION ID: {session_id}
 
-    Output:
-    {activity.output_data}
-    """
+INPUT DATA:
+{input_data}
 
-    response = clientAI.responses.create(
-        model="gpt-4.1",
-        input=prompt,
-        max_output_tokens=300
+OUTPUT DATA:
+{output_data}
+
+RISK LEVEL RULES:
+- "low": Normal behaviour.
+- "medium": Minor anomalies.
+- "high": Critical anomalies.
+
+ANOMALY RULES:
+- anomaly_detected = true if ANY suspicious pattern exists.
+- anomaly_detected = false otherwise.
+
+JSON FORMAT REQUIRED:
+{{
+    "summary": "short description",
+    "risk_level": "low | medium | high",
+    "possible_issue": "string or 'none'",
+    "anomaly_detected": true or false
+}}
+
+Return ONLY JSON.
+""")
+
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0
     )
 
-    ai_output_text = response.output_text
-    return json.loads(ai_output_text)
+    chain = prompt | llm | parser
+
+    result = await chain.ainvoke({
+        "agent_name": activity.agent_name,
+        "user_id": activity.user_id,
+        "session_id": activity.session_id,
+        "input_data": json.dumps(activity.input_data, indent=2),
+        "output_data": json.dumps(activity.output_data, indent=2),
+    })
+
+    return result
 
 
 # -------------------------------
-# ENDPOINT :: TRACK AGENT ACTIVITY
+# ✅ BACKGROUND MONITORING WORKER (NON-BLOCKING)
 # -------------------------------
 
-@router.post("/track-activity")
-async def track_agent_activity(activity: AgentActivity):
-    """
-    Logs an agent's activity AND uses an AI agent to analyze it.
-    """
+async def process_monitoring(activity: AgentActivity):
 
-    # 1. Run AI agent reasoning
     monitor_result = await run_monitoring_agent(activity)
 
-    # 2. Store in DB
-    client = MongoClient(key_param.MONGO_URI)
+    client = MongoClient(key_param.MONGO_URI_KB)
     db = client["blissMe"]
     collection = db["agent_activity_logs"]
 
@@ -101,10 +119,27 @@ async def track_agent_activity(activity: AgentActivity):
     collection.insert_one(final_record)
     client.close()
 
+
+# -------------------------------
+# ✅ ENDPOINT :: TRACK AGENT ACTIVITY (TIMEOUT FIXED)
+# -------------------------------
+
+@router.post("/track-activity")
+async def track_agent_activity(
+    activity: AgentActivity,
+    background_tasks: BackgroundTasks
+):
+    """
+    Logs agent activity and runs AI monitoring in background to avoid timeout.
+    """
+
+    # ✅ Run monitoring asynchronously (no blocking)
+    background_tasks.add_task(process_monitoring, activity)
+
+    # ✅ Immediate response (prevents Therapy Agent timeout)
     return {
-        "status": "logged",
-        "agent": activity.agent_name,
-        "monitoring": monitor_result
+        "status": "queued",
+        "agent": activity.agent_name
     }
 
 
@@ -114,11 +149,8 @@ async def track_agent_activity(activity: AgentActivity):
 
 @router.get("/get-session-events")
 async def get_session_events(user_id: int = Query(...)):
-    """
-    Retrieve all events for a given user.
-    Includes AI-monitor summaries.
-    """
-    client = MongoClient(key_param.MONGO_URI)
+
+    client = MongoClient(key_param.MONGO_URI_KB)
     db = client["blissMe"]
     collection = db["agent_activity_logs"]
 

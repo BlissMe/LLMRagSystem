@@ -6,6 +6,7 @@ load_dotenv()
 
 openai_api_key = os.getenv("openai_api_key")
 MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI_KB = os.getenv("MONGO_URI_KB")
 assemblyai_api_key = os.getenv("assemblyai_api_key")
 elevenlabs_api_key = os.getenv("elevenlabs_api_key")
 elevenlabs_voice_id = os.getenv("elevenlabs_voice_id")
@@ -18,6 +19,7 @@ required_keys = {
     "elevenlabs_api_key": elevenlabs_api_key,
     "elevenlabs_voice_id": elevenlabs_voice_id,
     "llm_base": llm_base,
+    "MONGO_URI_KB": MONGO_URI_KB
 }
 
 missing_keys = [k for k, v in required_keys.items() if not v]
