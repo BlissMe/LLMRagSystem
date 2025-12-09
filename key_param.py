@@ -1,0 +1,26 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+openai_api_key = os.getenv("openai_api_key")
+MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI_KB = os.getenv("MONGO_URI_KB")
+ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY")
+assemblyai_api_key = os.getenv("assemblyai_api_key")
+elevenlabs_api_key = os.getenv("elevenlabs_api_key")
+elevenlabs_voice_id = os.getenv("elevenlabs_voice_id")
+
+required_keys = {
+    "openai_api_key": openai_api_key,
+    "MONGO_URI": MONGO_URI,
+    "MONGO_URI_KB": MONGO_URI_KB,
+    "ENCRYPTION_KEY": ENCRYPTION_KEY,
+    "assemblyai_api_key": assemblyai_api_key,
+    "elevenlabs_api_key": elevenlabs_api_key,
+    "elevenlabs_voice_id": elevenlabs_voice_id,
+}
+
+missing_keys = [k for k, v in required_keys.items() if not v]
+if missing_keys:
+    raise ValueError(f"Missing environment variables: {', '.join(missing_keys)}")
