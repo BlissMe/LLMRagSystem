@@ -137,6 +137,10 @@ async def save_therapy_feedback(data: TherapyFeedback):
 # =======================
 @router.post("/chat")
 async def therapy_chat(data: TherapyRequest):
+    """
+    Therapy Agent main route:
+    Handles chat, suggests therapies, tracks user progress.
+    """
 
     client = MongoClient(key_param.MONGO_URI)
     db = client["blissMe"]
@@ -185,6 +189,20 @@ ACTION:START_THERAPY:{therapy_id}
 User history:
 {recent_history}
 
+If the user has moderate or minimal depression, suggest small helpful activities or therapies from the system.
+Therapies can include relaxation breathing, mindfulness, journaling, or gratitude reflection.
+don't use log sentences. keep it short and simple.
+don't mention about depression level or depression to the user.
+
+
+If a therapy matches one from the system, gently ask:
+"Would you like to start the {therapy_suggestion['name']} therapy now?"
+
+If the user agrees, return:
+ACTION:START_THERAPY:{therapy_suggestion['id']}
+
+Otherwise, continue gentle conversation and emotional support.
+
 User message: "{data.user_query}"
 """
 
@@ -225,10 +243,8 @@ User message: "{data.user_query}"
             db,
             data.user_id,
             data.session_id,
-            therapy_name,
-            therapy_id,
-            duration=None,
-            feedback=None
+            therapy_suggestion["name"],
+            therapy_suggestion["id"]
         )
 
         send_therapy_progress_event(
