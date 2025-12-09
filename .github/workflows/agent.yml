@@ -2,7 +2,7 @@ name: Sync to Hugging Face hub-learning
 
 on:
   push:
-    branches: [learning_agent]
+    branches: [Production]
   workflow_dispatch:
 
 jobs:
