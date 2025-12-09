@@ -97,59 +97,57 @@ async def ask_question(data: QueryRequest):
     user_turns = [line for line in data.history.splitlines() if line.lower().startswith("you:") or line.lower().startswith("user:")]
     early_stage = len(user_turns) < 3
 
-    phq_instruction = ""
-    if next_phq_q and not early_stage:
-        if not data.asked_phq_ids:
-            phq_instruction += f"""
-You may now gently say something like:
-"To better understand how you're doing, I'd like to ask a few short questions on how you feel in past two weeks."
+    # Only enable PHQ mode if user has chatted at least 3 times
+    phq_mode = False
+    if not early_stage and next_phq_q:
+        phq_mode = True
 
-Then ask this question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
+    # --- Build PHQ instruction if needed ---
+    phq_instruction = ""
+    if phq_mode:
+        if not data.asked_phq_ids:
+            # Before first PHQ question
+            phq_instruction = (
+                "You MUST now gently say something like:\n"
+                '"To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."\n'
+                "Then ask this first question EXACTLY as shown (do NOT paraphrase):\n"
+                f'- "{next_phq_q["meaning"]}"\n\n'
+                "After the user replies, respond with ONE SHORT caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”/ “I’m here for you.”) and move to the next PHQ-9 question in order EXACTLY as shown .\n"
+                "Ask only one PHQ question per message.\n"
+                "User can reply with: not at all, several days, more than half the days, nearly every day."
+            )
         else:
-            phq_instruction += f"""
-Continue with the next question:
-- "{next_phq_q['question']}" (meaning: {next_phq_q['meaning']})
-"""
-        phq_instruction += """
-Make your response short and caring. Don't explain too much. No repetition. Only ask one PHQ-9 question per message.
-Let user respond with:
-- not at all
-- several days
-- more than half the days
-- nearly every day
-"""
+            # For later PHQ questions
+            phq_instruction = (
+                "Respond with one short caring line (eg. “Thank you for sharing.” / “I understand, that sounds tough.” / “I understand.”/“I’m here for you.”) acknowledging the user’s last answer, then immediately ask the next PHQ-9 question in order and exactly as shown below (do NOT paraphrase):\n"
+                f'- "{next_phq_q["meaning"]}"\n\n'
+                "Do not add unrelated or extra questions.\n"
+                "Ask only one PHQ question per message.\n"
+                "User can reply with: not at all, several days, more than half the days, nearly every day."
+            )
 
     chat_prompt = f"""
 You are a friendly chatbot who talks like a kind friend.
-
-Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
-
-Your job is to gently explore how the user feels and try to understand user by asking questions, and ask PHQ-9 questions naturally when ready.
-
-NEVER mention PHQ-9 or say "I cannot help you".
-
-Avoid medical or crisis terms unless directly asked.
-
-Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
-
+- Be warm and caring. Avoid long or repetitive responses. Never say the same supportive line more than once.
+- Your job is to gently explore how the user feels and try to understand user by asking questions.
+- NEVER mention PHQ-9 or say "I cannot help you".
+- Avoid medical or crisis terms unless directly asked.
+- Keep your replies short and friendly. One question per message. Once PHQ-9 starts, go through them without pausing.
+-before starting phq-9, need to ask at least 3 normal chat turns.
+-then when starting phq-9, before first question, you MUST gently inform user about the questions like "To better understand how you’re doing, I’d like to ask a few short questions about how you’ve felt in the past two weeks."
+ - Ask all 9 PHQ-9 questions in order, one at a time, exactly given as in the phq_instruction.
+- After finishing all 9, continue chatting normally with care and empathy.
 Past summaries:
 {summary_text}
-
 Relevant context:
 {context_texts}
-
 Conversation history:
 {history}
-
+{phq_mode}
 {phq_instruction}
-
 User just said: "{query}"
-
 Now reply like a kind friend:
 """
-
     bot = ChatOpenAI(
         model="gpt-3.5-turbo",
         openai_api_key=key_param.openai_api_key,
