@@ -23,7 +23,7 @@ class AgentActivity(BaseModel):
     session_id: int
     input_data: dict
     output_data: dict
-    timestamp: datetime = Field(default_factory=datetime.utcnow)  # ✅ fixed timestamp bug
+    timestamp: datetime = Field(default_factory=datetime.utcnow) 
 
 
 class MonitorFeedbackRequest(BaseModel):
@@ -97,7 +97,7 @@ Return ONLY JSON.
 
 
 # -------------------------------
-# ✅ BACKGROUND MONITORING WORKER (NON-BLOCKING)
+#  BACKGROUND MONITORING WORKER (NON-BLOCKING)
 # -------------------------------
 
 async def process_monitoring(activity: AgentActivity):
@@ -121,7 +121,7 @@ async def process_monitoring(activity: AgentActivity):
 
 
 # -------------------------------
-# ✅ ENDPOINT :: TRACK AGENT ACTIVITY (TIMEOUT FIXED)
+# ENDPOINT :: TRACK AGENT ACTIVITY (TIMEOUT FIXED)
 # -------------------------------
 
 @router.post("/track-activity")
@@ -133,10 +133,10 @@ async def track_agent_activity(
     Logs agent activity and runs AI monitoring in background to avoid timeout.
     """
 
-    # ✅ Run monitoring asynchronously (no blocking)
+    #  Run monitoring asynchronously (no blocking)
     background_tasks.add_task(process_monitoring, activity)
 
-    # ✅ Immediate response (prevents Therapy Agent timeout)
+    #  Immediate response (prevents Therapy Agent timeout)
     return {
         "status": "queued",
         "agent": activity.agent_name
