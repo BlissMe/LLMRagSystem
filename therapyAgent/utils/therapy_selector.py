@@ -62,7 +62,7 @@ default_therapies = [
         "name": "Number Guessing Game",
         "applicableLevel": "Minimal",
         "description": "A fun and engaging number guessing game to distract and entertain users.",
-        "path": "/therapy/number-guessing-game",
+        "path": "/game/therapy_game",
         "durationMinutes": 10,
     },
     {
@@ -80,14 +80,6 @@ default_therapies = [
         "description": "A virtual Zen garden experience for reflection, focus, and cognitive grounding.",
         "path": "/therapy/zen",
         "durationMinutes": 5,
-    },
-     {
-        "therapyID": "T0011",
-        "name": "Anxiety_Games",
-        "applicableLevel": "Moderate",
-        "description": "A fun game-based therapy to reduce anxiety levels through interactive relaxation challenges.",
-        "path": "/dash/anxiety",
-        "durationMinutes": 15,
     },
 ]
 
