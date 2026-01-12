@@ -17,6 +17,7 @@ from CountingGame.game import router as game_router
 from LearningAgent.Feedback_Therapy.app_fastapi import router as therapyFeedback_router
 
 from therapyAgent.therapyAgent import router as therapy_router
+from therapyAgent.VoiceTherapyAgent.voiceTherapyAgent import voice_router, tts_router
 
 app = FastAPI()
  
@@ -41,6 +42,9 @@ app.include_router(game_router)
 
 app.include_router(therapy_router)
 app.include_router(therapyFeedback_router)
+app.include_router(voice_router)
+app.include_router(tts_router)
+
 
 @app.get("/")
 def root():

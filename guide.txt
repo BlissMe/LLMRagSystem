@@ -180,7 +180,6 @@ Pillow==10.3.0
 # FYPKnowledgeBase
 
 ### uvicorn main:app --reload
-
 ### uvicorn mainChat:app --reload
 
 
