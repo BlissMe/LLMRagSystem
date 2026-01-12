@@ -63,7 +63,7 @@ async def voice_chat(
         recent_emotions = emotion_list[-3:]
         overall_emotion = Counter(recent_emotions).most_common(1)[0][0]
 
-        # Whisper transcription
+        # Whisper transcription -- openai API call
         files = {
             'file': (audio.filename, BytesIO(audio_bytes), audio.content_type)
         }
