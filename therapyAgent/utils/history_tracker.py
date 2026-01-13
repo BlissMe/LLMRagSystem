@@ -1,6 +1,6 @@
 from datetime import datetime
 
-def save_therapy_history(db, user_id, session_id, therapy_name, therapy_id):
+def save_therapy_history(db, user_id, session_id, therapy_name, therapy_id ,duration=None, feedback=None):
     history_collection = db["TherapyHistory"]
     record = {
         "user_id": user_id,

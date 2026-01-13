@@ -24,7 +24,7 @@ async def voice_chat(
     asked_phq_ids: str = Form("[]"),
     history: str = Form(""),
     summaries: str = Form("[]"),
-    emotion_history: str = Form("[]")
+    emotion_history: str = Form("[]"),
 ):
     print("\n===== START /voice-chat DEBUG LOG =====\n")
 
@@ -89,7 +89,9 @@ async def voice_chat(
         user_query=user_query,
         history=history,
         summaries=summary_list,
-        asked_phq_ids=asked_ids
+        asked_phq_ids=asked_ids,
+        user_id= 2,
+        session_id=3
     )
 
     ask_result = await ask_question(query_data)

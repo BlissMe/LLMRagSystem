@@ -9,14 +9,14 @@ default_therapies = [
         "path": "/therapy/all-songs",
         "durationMinutes": 6,
     },
-    {
-        "therapyID": "T002",
-        "name": "Mindful Breathing",
-        "applicableLevel": "Moderate",
-        "description": "A breathing control game designed to synchronize breathing patterns with calming visuals.",
-        "path": "therapy/breathing",
-        "durationMinutes": 10,
-    },
+    # {
+    #     "therapyID": "T002",
+    #     "name": "Mindful Breathing",
+    #     "applicableLevel": "Moderate",
+    #     "description": "A breathing control game designed to synchronize breathing patterns with calming visuals.",
+    #     "path": "therapy/breathing",
+    #     "durationMinutes": 10,
+    # },
     {
         "therapyID": "T003",
         "name": "Meditation Session",
