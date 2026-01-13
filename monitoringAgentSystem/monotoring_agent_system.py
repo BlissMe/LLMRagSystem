@@ -80,7 +80,8 @@ Return ONLY JSON.
 
     llm = ChatOpenAI(
         model="gpt-4o-mini",
-        temperature=0
+        temperature=0,
+        openai_api_key=key_param.openai_api_key,
     )
 
     chain = prompt | llm | parser
