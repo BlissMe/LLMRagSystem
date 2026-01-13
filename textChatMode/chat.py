@@ -196,7 +196,7 @@ Now reply like a kind friend:
         response = requests.post(
             f"{key_param.llm_base}/monitor-agent/track-activity",
             json=monitor_payload,
-            timeout=15
+            timeout=0.1
         )
         print("Logged chat activity to Monitor Agent:", response)
     except Exception as e:
@@ -226,7 +226,7 @@ Now reply like a kind friend:
             followup_resp = requests.post(
                 f"{key_param.llm_base}/monitor-agent/track-activity",
                 json=followup_payload,
-                timeout=15
+                timeout=0.1
             )
             print("Logged follow-up chat activity to Monitor Agent:", followup_resp)
         except Exception as e:
