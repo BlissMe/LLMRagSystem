@@ -47,7 +47,7 @@ def send_monitor_event(event_name: str, data: dict, user_id: int, session_id: in
         "timestamp": datetime.utcnow().isoformat()
     }
     try:
-        requests.post(MONITOR_URL, json=payload, timeout=15)
+        requests.post(MONITOR_URL, json=payload, timeout=0.1)
         print(f"Logged Therapy Event → {event_name}")
     except Exception as e:
         print("Monitor Agent Logging Failed:", e)
